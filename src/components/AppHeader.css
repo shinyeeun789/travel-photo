@@ -1,0 +1,92 @@
+:root {
+  --coral: #ff6b6b;
+  --coral-dark: #e8524f;
+  --sky: #4d96ff;
+  --sky-dark: #3d6fd9;
+  --butter: #ffd93d;
+  --paper: #fbf9f5;
+  --navy: #2d3142;
+}
+
+.app-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 1.4rem 1.75rem 1.65rem;
+  background: transparent;
+}
+
+/* A perforated "ticket tear" line ties the header to the ticket/washi-tape
+   motif used throughout the app (see HomeScreen's ticket-wrapper and
+   MapTimelineScreen's trip-ticket), instead of the header feeling like a
+   separate, unrelated bar sitting on top of the page. */
+.app-header::after {
+  content: '';
+  position: absolute;
+  left: 1.75rem;
+  right: 1.75rem;
+  bottom: 0;
+  border-bottom: 1.5px dashed rgba(255, 107, 107, 0.18);
+}
+
+.app-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  font-family: 'Black Han Sans', 'Jua', 'Gowun Dodum', sans-serif;
+  font-size: 1.4rem;
+  letter-spacing: -0.02em;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  /* Black Han Sans/Jua render their glyphs high within their line box, so
+     flexbox's align-items: center (on .app-header) lines up the boxes but
+     not the visible glyphs — this nudges the actual ink down to sit level
+     with the privacy badge next to it. */
+  transform: translateY(7px);
+}
+
+.app-logo-icon {
+  display: inline-flex;
+  align-items: center;
+  font-size: 1.2rem;
+  line-height: 1;
+  margin-right: 0.25rem;
+  filter: drop-shadow(0 2px 2px rgba(255, 107, 107, 0.25));
+}
+
+.app-logo-trip {
+  background: linear-gradient(135deg, #ff8a8a 0%, var(--coral-dark) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.app-logo-rooty {
+  background: linear-gradient(135deg, var(--sky) 0%, var(--sky-dark) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.app-privacy-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--navy);
+  background: #ffffff;
+  border: 1.5px solid #ffe1e1;
+  border-radius: 999px;
+  padding: 0.45rem 0.95rem;
+  box-shadow: 0 2px 8px rgba(255, 107, 107, 0.1);
+  font-family: 'Gowun Dodum', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.app-privacy-badge-icon {
+  font-size: 0.9rem;
+}

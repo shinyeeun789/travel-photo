@@ -1,0 +1,760 @@
+:root {
+  --coral: #ff6b6b;
+  --coral-dark: #e8524f;
+  --sky: #4d96ff;
+  --sky-dark: #3d6fd9;
+  --butter: #ffd93d;
+  --paper: #fbf9f5;
+  --navy: #2d3142;
+}
+
+.map-timeline-page {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  background-image: radial-gradient(
+      circle at 4% 6%,
+      rgba(255, 217, 61, 0.28) 0,
+      transparent 26%
+    ),
+    radial-gradient(
+      circle at 96% 6%,
+      rgba(77, 150, 255, 0.2) 0,
+      transparent 26%
+    );
+}
+
+.map-timeline-screen {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  font-family: 'Gowun Dodum', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--navy);
+}
+
+/* ---- Map pane ---- */
+
+.map-pane {
+  position: relative;
+  flex: 1.15;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1.5rem 1.25rem 1rem;
+  border-right: 1px solid rgba(45, 49, 66, 0.06);
+}
+
+/* Sits as the first thing in .map-pane, which is the left column on PC
+   (top-left of the whole screen) and the first block on mobile's stacked
+   layout (top of the screen) — no separate positioning per breakpoint
+   needed, it just follows from being first in source order either way.
+   The "인스타 스토리 카드 만들기" CTA rides along on the same line, instead of
+   the fixed bar it used to float in at the bottom of the screen. */
+.map-pane-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.map-pane-topbar .timeline-back {
+  align-self: flex-start;
+  background: #ffffff;
+  border: 1.5px solid #f0ebe4;
+  border-radius: 999px;
+  padding: 0.45rem 1rem;
+  color: var(--navy);
+  font-weight: 600;
+  box-shadow: 0 6px 14px -8px rgba(45, 49, 66, 0.25);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.map-pane-topbar .timeline-back:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px -8px rgba(45, 49, 66, 0.3);
+}
+
+.map-pane .trip-map {
+  flex: 1;
+  max-height: 60vh;
+}
+
+/* Floats over the map while a no-GPS photo is waiting to be placed (see
+   TripMap's isPlacingLocation click mode). */
+.location-picker-banner {
+  position: absolute;
+  left: 50%;
+  top: 4.75rem;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: calc(100% - 2.5rem);
+  background: var(--navy);
+  color: #fff;
+  font-size: 0.82rem;
+  border-radius: 999px;
+  padding: 0.6rem 0.6rem 0.6rem 1rem;
+  box-shadow: 0 14px 28px -10px rgba(45, 49, 66, 0.5);
+}
+
+.location-picker-banner strong {
+  color: var(--butter);
+}
+
+.location-picker-cancel {
+  flex: none;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.location-picker-cancel:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.route-strip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding: 0.75rem 0.6rem;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1.5px solid rgba(255, 107, 107, 0.14);
+  box-shadow: 0 10px 22px -16px rgba(45, 49, 66, 0.28);
+}
+
+.route-strip-arrow {
+  color: #b9c4e0;
+  font-size: 1rem;
+  flex: none;
+}
+
+.route-strip-pin {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  padding: 0;
+  border: 2.5px solid #fff;
+  box-shadow: 0 0 0 2px var(--sky), 0 6px 12px -4px rgba(45, 49, 66, 0.25);
+  overflow: hidden;
+  cursor: pointer;
+  background: #fff;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.route-strip-pin:hover {
+  transform: translateY(-2px);
+}
+
+.route-strip-pin--active {
+  box-shadow: 0 0 0 3px var(--coral), 0 8px 16px -4px rgba(255, 107, 107, 0.4);
+}
+
+.route-strip-pin--no-gps {
+  box-shadow: 0 0 0 2px #d8d3e0, 0 6px 12px -4px rgba(45, 49, 66, 0.2);
+  opacity: 0.7;
+}
+
+.route-play-button {
+  position: relative;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: none;
+  background: linear-gradient(135deg, var(--coral), var(--coral-dark));
+  color: #fff;
+  font-family: 'Jua', sans-serif;
+  font-size: 0.95rem;
+  padding: 0.75rem 1.75rem;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 10px 20px -6px rgba(255, 107, 107, 0.45);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.route-play-button:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 12px 24px -6px rgba(255, 107, 107, 0.55);
+}
+
+.route-play-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  box-shadow: none;
+}
+
+
+/* ---- Timeline pane ---- */
+
+.timeline-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 1.75rem;
+  overflow-y: auto;
+  gap: 1.1rem;
+}
+
+.timeline-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.timeline-back {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  color: #8a8fa3;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0.2rem 0;
+}
+
+.timeline-back:hover {
+  color: var(--navy);
+}
+
+/* The "boarding pass" ticket card tying this screen back to the home
+   screen's washi-tape/ticket motif — a torn-stub layout (icon stub +
+   perforated divider with punched notches) instead of a plain rounded
+   card, so it reads as an actual ticket rather than a stats panel. */
+.trip-ticket {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1.5px solid rgba(255, 107, 107, 0.16);
+  box-shadow: 0 18px 36px -20px rgba(255, 107, 107, 0.3),
+    0 2px 0 rgba(45, 49, 66, 0.03);
+  overflow: hidden;
+  transform: rotate(-0.6deg);
+}
+
+/* Left "stub" section, like the tear-off half of a real ticket — a solid
+   coral block with the vertical TRIP TICKET label, separated from the
+   stats by the perforated divider below. */
+.trip-ticket-stub {
+  flex: none;
+  width: 74px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem 0.4rem;
+  background: linear-gradient(160deg, var(--coral), var(--coral-dark));
+  color: #fff;
+}
+
+.trip-ticket-stub-icon {
+  font-size: 1.3rem;
+}
+
+.trip-ticket-stub-label {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-family: 'Jua', sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  line-height: 1.3;
+  opacity: 0.92;
+}
+
+/* Punched-hole notches sitting on the perforated line between the stub and
+   the main panel — half circles cut out of both edges so the divider reads
+   as a tear line, the way a real ticket stub separates from the body. */
+.trip-ticket-notch {
+  position: absolute;
+  left: calc(74px - 9px);
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--paper);
+  z-index: 3;
+}
+
+.trip-ticket-notch--top {
+  top: -9px;
+}
+
+.trip-ticket-notch--bottom {
+  bottom: -9px;
+}
+
+.trip-ticket-main {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  padding: 1.1rem 1.1rem 1rem 1.35rem;
+  border-left: 1.5px dashed #f2c9c9;
+}
+
+.trip-ticket-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: 'Jua', sans-serif;
+  font-size: 0.95rem;
+  color: var(--coral-dark);
+  margin-bottom: 0.85rem;
+}
+
+.timeline-summary {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* A stripe of unevenly-spaced bars under the stats, purely decorative —
+   mimics a boarding-pass barcode to sell the "ticket" read at a glance. */
+.trip-ticket-barcode {
+  margin-top: 0.9rem;
+  height: 22px;
+  border-radius: 2px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--navy) 0,
+    var(--navy) 2px,
+    transparent 2px,
+    transparent 4px,
+    var(--navy) 4px,
+    var(--navy) 5px,
+    transparent 5px,
+    transparent 9px,
+    var(--navy) 9px,
+    var(--navy) 12px,
+    transparent 12px,
+    transparent 14px
+  );
+  opacity: 0.16;
+}
+
+.summary-stat {
+  flex: 1;
+  min-width: 110px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  background: var(--paper);
+  border: 1px solid #f0ebe4;
+  border-radius: 14px;
+  padding: 0.85rem 1rem;
+}
+
+.summary-stat-value {
+  font-family: 'Jua', sans-serif;
+  font-size: 1.05rem;
+  color: var(--coral-dark);
+}
+
+.summary-stat-label {
+  font-size: 0.72rem;
+  color: #a29db0;
+}
+
+.no-gps-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  border: 1.5px dashed #ffcf8a;
+  background: #fff8ec;
+  color: #a5731f;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 14px;
+  padding: 0.7rem 1rem;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.15s ease;
+}
+
+.no-gps-chip:hover {
+  transform: translateY(-1px);
+}
+
+.no-gps-chip-cta {
+  font-size: 0.78rem;
+  text-decoration: underline;
+  white-space: nowrap;
+}
+
+/* ---- Photo timeline (large photos, connected by a rail) ---- */
+
+.photo-timeline {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+}
+
+/* One continuous line the full height of the list, instead of a separate
+   segment per item — per-item segments only spanned each item's own box,
+   so the gap between cards (the flex `gap` above) broke the line into
+   visibly disconnected dashes. This sits behind the dots (z-index) and
+   runs from the first dot's center to the last one's. */
+.photo-timeline-rail-line {
+  position: absolute;
+  left: 9px;
+  top: 21px;
+  bottom: 21px;
+  width: 2px;
+  background: repeating-linear-gradient(
+    to bottom,
+    #d8d3e0 0,
+    #d8d3e0 4px,
+    transparent 4px,
+    transparent 9px
+  );
+  z-index: 0;
+}
+
+.photo-timeline-item {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: stretch;
+  gap: 0.85rem;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+
+.photo-timeline-item:focus-visible {
+  outline: 2px solid var(--sky);
+  outline-offset: 3px;
+  border-radius: 12px;
+}
+
+.photo-timeline-rail {
+  flex: none;
+  width: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.photo-timeline-dot {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 14px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--sky);
+  box-shadow: 0 0 0 3px var(--paper);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.photo-timeline-item--active .photo-timeline-dot {
+  border-color: var(--coral);
+  transform: scale(1.15);
+}
+
+.photo-timeline-card {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1.5px solid #f0ebe4;
+  border-radius: 20px;
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.photo-timeline-item:hover .photo-timeline-card {
+  border-color: rgba(77, 150, 255, 0.4);
+  transform: translateX(2px);
+}
+
+.photo-timeline-item--active .photo-timeline-card {
+  border-color: var(--coral);
+  box-shadow: 0 12px 26px -14px rgba(255, 107, 107, 0.5);
+}
+
+/* Bigger than the old 56px thumbnail so the photo is actually visible, at a
+   fixed card height for a consistent-looking feed. Real photos (the
+   .photo-thumb-img case below) use object-fit: contain rather than cover —
+   cover was cropping portrait phone photos down to a sliver, cutting off
+   the actual subject; contain always shows the whole photo, letterboxed
+   (against the same background) on whichever side doesn't fill the box. */
+/* Sized so roughly two photos are visible in the timeline pane at once
+   instead of many small ones (vh-based so it scales with the actual
+   browser window, not a hardcoded breakpoint — a resized/half-width
+   desktop window is still a desktop, not the phone-sized viewport the
+   900px breakpoint elsewhere is really about). */
+.photo-timeline-photo {
+  position: relative;
+  width: 100%;
+  height: 38vh;
+  background: #f5eeea;
+}
+
+.photo-timeline-photo .photo-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.photo-timeline-photo .photo-thumb-placeholder {
+  width: 100%;
+  height: 100%;
+}
+
+.photo-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.photo-thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.4rem;
+  background: linear-gradient(150deg, #fff0ee 0%, #ffe4c4 100%);
+}
+
+.photo-timeline-no-gps-badge {
+  position: absolute;
+  left: 0.6rem;
+  top: 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #a5731f;
+  background: #fff8ec;
+  border: 1px solid #ffe1b8;
+  border-radius: 999px;
+  padding: 0.25rem 0.6rem;
+}
+
+.photo-timeline-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  padding: 0.7rem 1rem;
+}
+
+.photo-timeline-time {
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--navy);
+}
+
+.photo-timeline-location-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.photo-timeline-location {
+  font-size: 0.75rem;
+  color: #a29db0;
+}
+
+.photo-timeline-edit-location {
+  border: none;
+  background: none;
+  color: var(--sky-dark);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  transition: background 0.15s ease;
+}
+
+.photo-timeline-edit-location:hover {
+  background: rgba(77, 150, 255, 0.12);
+}
+
+/* ---- Story-card CTA (sits on the map-pane topbar, next to 다시 시작) ---- */
+
+.floating-cta-button {
+  border: none;
+  background: linear-gradient(135deg, var(--coral), var(--coral-dark));
+  color: #fff;
+  font-family: 'Jua', sans-serif;
+  font-size: 0.9rem;
+  padding: 0.65rem 1.4rem;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 10px 20px -8px rgba(255, 107, 107, 0.55);
+  transition: transform 0.15s ease;
+}
+
+.floating-cta-button:hover {
+  transform: translateY(-2px);
+}
+
+/* ---- No-GPS modal ---- */
+
+.no-gps-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(45, 49, 66, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  z-index: 30;
+}
+
+.no-gps-modal {
+  width: min(420px, 100%);
+  max-height: 80vh;
+  overflow-y: auto;
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.no-gps-modal-title {
+  margin: 0;
+  font-family: 'Jua', sans-serif;
+  font-size: 1.1rem;
+  color: var(--navy);
+}
+
+.no-gps-modal-desc {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #8a8fa3;
+  line-height: 1.5;
+}
+
+.no-gps-modal-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.no-gps-modal-item {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  border: 1.5px solid #f0ebe4;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 0.5rem 0.7rem;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.no-gps-modal-item:hover {
+  border-color: var(--sky);
+  background: #f0f6ff;
+}
+
+.no-gps-modal-thumb {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.no-gps-modal-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font-size: 0.82rem;
+  color: var(--navy);
+  min-width: 0;
+  flex: 1;
+}
+
+.no-gps-modal-item-info span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.no-gps-modal-item-time {
+  font-size: 0.72rem;
+  color: #a29db0;
+}
+
+.no-gps-modal-item-cta {
+  flex: none;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--sky-dark);
+  white-space: nowrap;
+}
+
+.no-gps-modal-close {
+  align-self: flex-end;
+  border: none;
+  background: var(--navy);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.55rem 1.3rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+/* ---- Responsive: PC 좌우 분할 / 모바일 상하 분할 ---- */
+
+@media (max-width: 900px) {
+  .map-timeline-page {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .map-timeline-screen {
+    flex-direction: column;
+  }
+
+  .map-pane {
+    border-right: none;
+    border-bottom: 1px solid rgba(45, 49, 66, 0.06);
+    flex: none;
+    min-height: 460px;
+  }
+
+  .timeline-pane {
+    flex: none;
+  }
+}
