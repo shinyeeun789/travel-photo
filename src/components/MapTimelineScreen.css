@@ -62,6 +62,9 @@
 
 .map-pane-topbar .timeline-back {
   align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   background: #ffffff;
   border: 1.5px solid #f0ebe4;
   border-radius: 999px;
@@ -70,6 +73,10 @@
   font-weight: 600;
   box-shadow: 0 6px 14px -8px rgba(45, 49, 66, 0.25);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.timeline-back-arrow {
+  line-height: 1;
 }
 
 .map-pane-topbar .timeline-back:hover {
@@ -190,6 +197,12 @@
 .route-play-button:hover:not(:disabled) {
   transform: translateY(-2px) scale(1.02);
   box-shadow: 0 12px 24px -6px rgba(255, 107, 107, 0.55);
+}
+
+.route-play-icon {
+  flex: none;
+  width: 0.7rem;
+  height: 0.85rem;
 }
 
 .route-play-button:disabled {

@@ -139,7 +139,10 @@ function MapTimelineScreen({
       <section className="map-pane">
         <div className="map-pane-topbar">
           <button type="button" className="timeline-back" onClick={onBack}>
-            ← 다시 시작
+            <span className="timeline-back-arrow" aria-hidden="true">
+              ←
+            </span>
+            <span>다시 시작</span>
           </button>
           {/*<button*/}
           {/*  type="button"*/}
@@ -208,7 +211,20 @@ function MapTimelineScreen({
           onClick={() => setRoutePlaying(true)}
           disabled={routePlaying || geoTaggedPhotos.length < 2}
         >
-          {routePlaying ? '재생 중...' : '▶ 여행 발자취 재생'}
+          {routePlaying ? (
+            '재생 중...'
+          ) : (
+            <>
+              <svg
+                className="route-play-icon"
+                viewBox="0 0 10 12"
+                aria-hidden="true"
+              >
+                <polygon points="0,0 10,6 0,12" fill="currentColor" />
+              </svg>
+              여행 발자취 재생
+            </>
+          )}
         </button>
       </section>
 

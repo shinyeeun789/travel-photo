@@ -1089,21 +1089,65 @@ function TripMap({
     onSelectPhoto?.(stops.photoIds[0]);
     stampStop(0);
 
-    // The camera is driven by chained easeTo calls, one per leg, instead of
-    // being repositioned by hand every animation frame. Repainting the
-    // whole map (this style has ~25+ vector layers, several with label
-    // collision detection that reruns on every camera change) 60 times a
-    // second is more than it can keep up with — that's what read as
-    // stutter. A single eased transition per leg lets MapLibre's own
-    // renderer pace and prefetch the tiles it needs, which it's built to
-    // do smoothly; only the marker (cheap — just a DOM position) follows
-    // the spline every frame.
+    // Tried driving the camera by hand every frame (map.jumpTo tracking the
+    // same interpolated point as the marker) instead of chaining easeTo per
+    // leg, hoping to remove the restart cost at leg boundaries now that
+    // label collision + feather blur are already off during playback.
+    // Measured worse, not better (25 hitches >30ms vs 19, worst spike 466ms
+    // vs 350ms) — jumpTo forces MapLibre to reproject and repaint every
+    // remaining active layer synchronously on every single call, and at 60
+    // calls/sec that cost is bigger than the per-leg restart cost it was
+    // meant to avoid.
+    //
+    // What actually measured as the hitch source was clusters of *short*
+    // legs firing a new easeTo every few hundred ms (stops close together
+    // in real distance) — each call interrupts and restarts MapLibre's
+    // transition state. So instead of one easeTo per leg, consecutive short
+    // legs are merged into a single easeTo that glides straight through all
+    // of them at once — one continuous camera motion instead of several
+    // rapid restarts. A long leg on its own still gets its own easeTo; only
+    // legs *below* the merge threshold get bundled with their neighbors.
+    const CAMERA_MERGE_THRESHOLD_MS = 900;
+    const cameraSegments = [];
+    {
+      let segDurationMs = 0;
+      for (let i = 0; i < numLegs; i++) {
+        const legDur = legDurationsMs[i];
+        // A leg that's already long on its own must never get folded into
+        // whatever short legs came before it (that would merge a huge
+        // real-world jump into one continuous glide, forcing a burst of
+        // fresh tile loads mid-pan) — flush the accumulated short-leg
+        // group as its own segment first, *then* start counting this leg.
+        if (legDur >= CAMERA_MERGE_THRESHOLD_MS && segDurationMs > 0) {
+          cameraSegments.push({ toLeg: i - 1, durationMs: segDurationMs });
+          segDurationMs = 0;
+        }
+        segDurationMs += legDur;
+        const isLastLeg = i === numLegs - 1;
+        if (segDurationMs >= CAMERA_MERGE_THRESHOLD_MS || isLastLeg) {
+          cameraSegments.push({ toLeg: i, durationMs: segDurationMs });
+          segDurationMs = 0;
+        }
+      }
+    }
+    // Which leg starts each segment, so the leg-boundary loop below knows
+    // when to actually kick off a new easeTo vs. let an in-flight one keep
+    // gliding through a merged stop.
+    const segmentByStartLeg = new Map();
+    {
+      let legCursor = 0;
+      cameraSegments.forEach((seg) => {
+        segmentByStartLeg.set(legCursor, seg);
+        legCursor = seg.toLeg + 1;
+      });
+    }
     const advanceCameraLeg = (legIndex) => {
-      if (legIndex >= numLegs) return;
+      const seg = segmentByStartLeg.get(legIndex);
+      if (!seg) return;
       map.easeTo({
-        center: stops.coords[legIndex + 1],
+        center: stops.coords[seg.toLeg + 1],
         zoom: playbackZoom,
-        duration: legDurationsMs[legIndex],
+        duration: seg.durationMs,
         easing: (x) => x,
       });
     };
@@ -1127,12 +1171,10 @@ function TripMap({
         // (route-strip + timeline active-item highlighting), and stampStop
         // builds a DOM node (photo <img>, decode included) and inserts a
         // whole new MapLibre Marker — both real layout/paint cost. Doing
-        // either in the exact same tick as advanceCameraLeg's easeTo() call
-        // (which kicks off its own camera repaint) piled expensive work onto
-        // one frame, which is what read as a "드드득" hitch right as each
-        // stop's photo popped in. Pushing both to the very next frame lets
-        // this frame finish with just the cheap camera call, spreading the
-        // cost over two frames instead of stacking it.
+        // either in the same frame the boundary is crossed piled expensive
+        // work onto that frame, which is what read as a "드드득" hitch right
+        // as each stop's photo popped in. Pushing both to the very next
+        // frame keeps this frame to just the cheap position update below.
         requestAnimationFrame(() => {
           onSelectPhoto?.(stops.photoIds[legToStamp]);
           stampStop(legToStamp);
