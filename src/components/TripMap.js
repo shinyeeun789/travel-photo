@@ -63,6 +63,41 @@ const LABEL_LAYER_IDS = ['korea', 'japan'].flatMap((source) =>
   )
 );
 
+// Route-play "stamp" photos render at just 46px on screen (see
+// .trip-map-stamp in TripMap.css), but were being decoded straight from the
+// original uploaded file — a real phone photo can be several MB and 3000px+
+// on a side, and decoding that just to show a 46px circle is real,
+// measurable main-thread work. On weaker mobile hardware this was enough to
+// visibly freeze playback right as whichever stop's decode was still in
+// flight when the marker reached it. createImageBitmap's resize option lets
+// supporting browsers decode directly at a much smaller internal
+// resolution — cheaper than a full decode followed by a canvas downscale —
+// and the small canvas output means any later re-paint is trivially cheap
+// too. Falls back to the original file's own object URL if
+// createImageBitmap (or resizing) isn't supported.
+const STAMP_THUMB_MAX_SIZE = 160;
+async function createStampThumbnailUrl(file) {
+  try {
+    const bitmap = await createImageBitmap(file, {
+      resizeWidth: STAMP_THUMB_MAX_SIZE,
+      resizeQuality: 'medium',
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0);
+    bitmap.close?.();
+    const blob = await new Promise((resolve) =>
+      canvas.toBlob(resolve, 'image/jpeg', 0.8)
+    );
+    if (blob) return URL.createObjectURL(blob);
+  } catch {
+    // createImageBitmap/canvas unsupported or failed — fall through.
+  }
+  return URL.createObjectURL(file);
+}
+
 // Bounding box roughly covering the Korean peninsula, used to cap how far
 // out the user can zoom (see setMinZoom below).
 const KOREA_PENINSULA_BOUNDS = [
@@ -949,11 +984,16 @@ function TripMap({
         if (!photoId || stampUrlsRef.current[photoId]) return;
         const photo = photos.find((p) => p.id === photoId);
         if (!photo?.file) return;
-        const url = URL.createObjectURL(photo.file);
-        stampUrlsRef.current[photoId] = url;
-        const warmImg = new Image();
-        warmImg.src = url;
-        warmImg.decode?.().catch(() => {});
+        createStampThumbnailUrl(photo.file).then((url) => {
+          // Another path (a missed-preload fallback in stampStop, or a
+          // replay) may have already filled this in while the decode
+          // above was in flight — don't clobber it or leak this blob.
+          if (stampUrlsRef.current[photoId]) {
+            URL.revokeObjectURL(url);
+            return;
+          }
+          stampUrlsRef.current[photoId] = url;
+        });
       });
     }, 0);
 
