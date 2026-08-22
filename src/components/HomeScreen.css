@@ -22,12 +22,18 @@
       circle at 96% 94%,
       rgba(77, 150, 255, 0.2) 0,
       transparent 26%
+    ),
+    radial-gradient(
+      circle at 88% 8%,
+      rgba(255, 107, 107, 0.14) 0,
+      transparent 22%
     );
   color: var(--navy);
   font-family: 'Gowun Dodum', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 .hero-section {
+  position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -36,12 +42,128 @@
   padding: 2.5rem 1.5rem 3rem;
   gap: 1.9rem;
   text-align: center;
+  overflow: hidden;
+}
+
+/* Softly drifting travel-themed stickers scattered around the hero — pure
+   atmosphere, hidden from assistive tech (aria-hidden in the markup) and
+   clipped by .hero-section's overflow so they never cause horizontal
+   scroll on narrow viewports. */
+.hero-decor {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.hero-decor-item {
+  position: absolute;
+  font-size: 1.8rem;
+  opacity: 0.5;
+  filter: drop-shadow(0 4px 6px rgba(45, 49, 66, 0.12));
+  animation: hero-decor-float 6s ease-in-out infinite;
+}
+
+.hero-decor-item--1 {
+  top: 12%;
+  left: 8%;
+  animation-delay: -0.5s;
+}
+
+.hero-decor-item--2 {
+  top: 18%;
+  right: 10%;
+  font-size: 1.6rem;
+  animation-delay: -2.5s;
+}
+
+.hero-decor-item--3 {
+  bottom: 14%;
+  left: 6%;
+  font-size: 1.5rem;
+  animation-delay: -4s;
+}
+
+.hero-decor-item--4 {
+  bottom: 20%;
+  right: 7%;
+  animation-delay: -1.5s;
+}
+
+@keyframes hero-decor-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-4deg);
+  }
+  50% {
+    transform: translateY(-12px) rotate(4deg);
+  }
+}
+
+.hero-heading {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.hero-heading-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--coral-dark);
+  background: #fff0ee;
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+}
+
+.hero-heading-title {
+  margin: 0;
+  font-family: 'Jua', sans-serif;
+  font-weight: 400;
+  font-size: clamp(1.4rem, 3.4vw, 1.9rem);
+  line-height: 1.4;
+  color: var(--navy);
+}
+
+@media (max-width: 480px) {
+  .hero-decor-item {
+    font-size: 1.3rem;
+  }
 }
 
 .ticket-wrapper {
   position: relative;
+  z-index: 1;
   width: min(500px, 100%);
   padding-top: 12px;
+}
+
+/* Punched-hole notches on the drop-zone's sides, echoing the boarding-pass
+   ticket used elsewhere in the app — sells the "ticket-wrapper" name as an
+   actual ticket shape rather than just a plain rounded card. */
+.ticket-wrapper-notch {
+  position: absolute;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  margin-top: -11px;
+  border-radius: 50%;
+  background: var(--paper);
+  box-shadow: inset 0 2px 4px rgba(45, 49, 66, 0.08);
+  z-index: 2;
+}
+
+.ticket-wrapper-notch--left {
+  left: -11px;
+}
+
+.ticket-wrapper-notch--right {
+  right: -11px;
 }
 
 .washi-tape {
@@ -119,6 +241,17 @@
   background: linear-gradient(150deg, #fff0ee 0%, #ffe4c4 100%);
   box-shadow: 0 0 0 6px #fff4ec, 0 10px 22px rgba(255, 107, 107, 0.22);
   margin-bottom: 0.35rem;
+  animation: icon-badge-bob 3.2s ease-in-out infinite;
+}
+
+@keyframes icon-badge-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
 }
 
 .icon-badge-glyph {
@@ -244,15 +377,17 @@
 }
 
 .outcome-preview {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.1rem;
+  gap: 2.2rem;
   width: 100%;
 }
 
 .outcome-heading {
-  margin: 0;
+  margin: 1.2rem 0 0;
   font-family: 'Jua', sans-serif;
   font-size: 1.05rem;
   color: var(--coral-dark);
@@ -260,10 +395,10 @@
 
 .outcome-preview-row {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  gap: 2rem;
+  gap: 2.8rem;
   width: 100%;
 }
 
@@ -278,7 +413,14 @@
   flex-direction: column;
   align-items: center;
   gap: 0.5rem;
-  width: min(280px, 100%);
+  width: min(340px, 100%);
+}
+
+.journey-preview-card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .journey-preview-svg {
@@ -289,26 +431,35 @@
 
 .journey-preview-path {
   stroke: var(--sky);
-  stroke-width: 2.5;
+  stroke-width: 2.75;
   stroke-linecap: round;
   stroke-dasharray: 1 10;
-  opacity: 0.7;
+  opacity: 0.75;
 }
 
 .journey-preview-pin circle:first-child {
   fill: #ffffff;
   stroke: var(--coral);
   stroke-width: 2.5;
+  filter: drop-shadow(0 2px 3px rgba(255, 107, 107, 0.35));
 }
 
 .journey-preview-pin-core {
   fill: var(--coral);
 }
 
+/* The trip's final stop — bigger, coral-filled and camera-badged so the eye
+   lands on it as the payoff of the route, instead of blending in as just
+   another pale, butter-ringed dot. */
 .journey-preview-pin--final circle {
-  fill: #ffffff;
-  stroke: var(--butter);
-  stroke-width: 2.5;
+  fill: var(--coral-dark);
+  stroke: #ffffff;
+  stroke-width: 3;
+  filter: drop-shadow(0 3px 6px rgba(232, 82, 79, 0.45));
+}
+
+.journey-preview-pin--final text {
+  filter: drop-shadow(0 1px 1px rgba(45, 49, 66, 0.25));
 }
 
 .ticket-preview {
@@ -316,29 +467,99 @@
   flex-direction: column;
   align-items: center;
   gap: 0.5rem;
-  width: min(240px, 100%);
+  width: min(340px, 100%);
 }
 
+/* Mirrors the real "trip ticket" boarding-pass card on the map/timeline
+   screen (torn stub + punched notches + dashed tear line) at preview
+   scale, so this card previews what that screen actually looks like.
+   flex:1 matches the map card's height in the stretch row instead of
+   shrink-wrapping to its own content. */
 .ticket-preview-card {
+  position: relative;
+  flex: 1;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   width: 100%;
   background: #ffffff;
   border-radius: 16px;
   border: 1px solid rgba(255, 107, 107, 0.14);
   box-shadow: 0 14px 28px -14px rgba(45, 49, 66, 0.25);
-  transform: rotate(-2.5deg);
+  transform: rotate(-2deg);
   overflow: hidden;
+}
+
+.ticket-preview-stub {
+  flex: none;
+  width: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.2rem;
+  background: linear-gradient(160deg, var(--coral), var(--coral-dark));
+  color: #fff;
+}
+
+.ticket-preview-stub-icon {
+  font-size: 1.15rem;
+}
+
+.ticket-preview-stub-label {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-family: 'Jua', sans-serif;
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+  line-height: 1.3;
+  opacity: 0.9;
+}
+
+.ticket-preview-notch {
+  position: absolute;
+  left: calc(44px - 7px);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--paper);
+  z-index: 2;
+}
+
+.ticket-preview-notch--top {
+  top: -7px;
+}
+
+.ticket-preview-notch--bottom {
+  bottom: -7px;
+}
+
+.ticket-preview-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.7rem;
+  padding: 0.9rem 0.95rem;
+  border-left: 1.5px dashed #f2c9c9;
+}
+
+.ticket-preview-main-top {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
 }
 
 .ticket-preview-photo {
   flex: none;
-  width: 56px;
-  height: 68px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.5rem;
+  font-size: 1.3rem;
+  border-radius: 11px;
   background: linear-gradient(150deg, #fff0ee 0%, #ffe4c4 100%);
 }
 
@@ -346,15 +567,14 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
-  padding: 0.5rem 0.6rem;
+  gap: 0.2rem;
   min-width: 0;
   text-align: left;
 }
 
 .ticket-preview-title {
   font-family: 'Jua', sans-serif;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   color: var(--navy);
   white-space: nowrap;
   overflow: hidden;
@@ -362,24 +582,55 @@
 }
 
 .ticket-preview-date {
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   color: #a29db0;
 }
 
-.ticket-preview-stub {
-  flex: none;
-  width: 44px;
-  align-self: stretch;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-left: 1.5px dashed #f0d9d9;
-  background: linear-gradient(145deg, var(--sky) 0%, #7fb1ff 100%);
+/* Echoes the real ticket's barcode strip (horizontal, under the stats)
+   rather than a cramped vertical sliver — unevenly spaced bars, purely
+   decorative. */
+.ticket-preview-barcode {
+  height: 16px;
+  border-radius: 2px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--navy) 0,
+    var(--navy) 2px,
+    transparent 2px,
+    transparent 4px,
+    var(--navy) 4px,
+    var(--navy) 5px,
+    transparent 5px,
+    transparent 9px,
+    var(--navy) 9px,
+    var(--navy) 12px,
+    transparent 12px,
+    transparent 14px
+  );
+  opacity: 0.14;
 }
 
-.ticket-preview-stub-icon {
-  font-size: 1.1rem;
-  filter: drop-shadow(0 1px 1px rgba(45, 49, 66, 0.2));
+.feature-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-top: 0.3rem;
+}
+
+.feature-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--navy);
+  background: #ffffff;
+  border: 1px solid rgba(45, 49, 66, 0.08);
+  border-radius: 999px;
+  padding: 0.45rem 0.95rem;
+  box-shadow: 0 6px 14px -10px rgba(45, 49, 66, 0.35);
 }
 
 .sample-trip-link {
@@ -398,4 +649,44 @@
 .sample-trip-link:hover {
   background: #f0f6ff;
   transform: translateY(-1px);
+}
+
+/* ---- Footer ---- */
+
+.home-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.8rem 1.5rem 2.2rem;
+  border-top: 1.5px dashed rgba(45, 49, 66, 0.1);
+  text-align: center;
+}
+
+.home-footer-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: 'Jua', sans-serif;
+  font-size: 0.95rem;
+  color: var(--coral-dark);
+}
+
+.home-footer-logo {
+  font-size: 1rem;
+}
+
+.home-footer-tagline {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  color: #9a95a8;
+}
+
+.home-footer-copyright {
+  margin: 0;
+  font-size: 0.7rem;
+  color: #c2bdcc;
 }
