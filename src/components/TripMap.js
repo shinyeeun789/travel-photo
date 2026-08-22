@@ -1083,7 +1083,8 @@ function TripMap({
     }
     const totalDurationMs = legStartMs[numLegs];
 
-    const startTime = performance.now();
+    let startTime = performance.now();
+    let lastFrameNow = startTime;
     let rafId;
     let currentLeg = 0;
     onSelectPhoto?.(stops.photoIds[0]);
@@ -1154,6 +1155,21 @@ function TripMap({
     advanceCameraLeg(0);
 
     const step = (now) => {
+      // If the browser stalled between frames for a while — tab backgrounded,
+      // GPU busy with a big camera paint, iOS Safari throttling rAF, etc. —
+      // that gap must not count as playback progress. Without this, the
+      // very next frame's `elapsed` jumps so far ahead that `t` below
+      // clamps straight to 1, and the marker/camera warp instantly to the
+      // final stop instead of continuing to play through the rest of the
+      // route (observed on iOS Safari: playback froze partway, then jumped
+      // straight to the last coordinate). Pushing `startTime` forward by
+      // the stall's length makes playback simply resume where it left off.
+      const frameGap = now - lastFrameNow;
+      if (frameGap > 250) {
+        startTime += frameGap;
+      }
+      lastFrameNow = now;
+
       // Clamp to >= 0: the rAF callback's timestamp can land a fraction of
       // a millisecond before the `startTime` captured just above (a known
       // rAF timing quirk), which without this floors to index -1 and hands
