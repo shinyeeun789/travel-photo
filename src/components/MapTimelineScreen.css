@@ -1,37 +1,23 @@
-:root {
-  --coral: #ff6b6b;
-  --coral-dark: #e8524f;
-  --sky: #4d96ff;
-  --sky-dark: #3d6fd9;
-  --butter: #ffd93d;
-  --paper: #fbf9f5;
-  --navy: #2d3142;
-}
-
 .map-timeline-page {
   height: 100vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  background: var(--paper);
+  background: var(--cream);
   background-image: radial-gradient(
-      circle at 4% 6%,
-      rgba(255, 217, 61, 0.28) 0,
-      transparent 26%
+      circle at 5% 5%,
+      rgba(244, 205, 102, 0.28) 0,
+      transparent 24%
     ),
-    radial-gradient(
-      circle at 96% 6%,
-      rgba(77, 150, 255, 0.2) 0,
-      transparent 26%
-    );
+    radial-gradient(circle at 95% 6%, rgba(110, 169, 214, 0.22) 0, transparent 24%);
 }
 
 .map-timeline-screen {
   flex: 1;
   min-height: 0;
   display: flex;
-  font-family: 'Gowun Dodum', -apple-system, BlinkMacSystemFont, sans-serif;
-  color: var(--navy);
+  font-family: var(--font-body);
+  color: var(--cocoa);
 }
 
 /* ---- Map pane ---- */
@@ -43,15 +29,9 @@
   flex-direction: column;
   gap: 0.6rem;
   padding: 1.5rem 1.25rem 1rem;
-  border-right: 1px solid rgba(45, 49, 66, 0.06);
+  border-right: 2px dashed var(--dash-soft);
 }
 
-/* Sits as the first thing in .map-pane, which is the left column on PC
-   (top-left of the whole screen) and the first block on mobile's stacked
-   layout (top of the screen) — no separate positioning per breakpoint
-   needed, it just follows from being first in source order either way.
-   The "인스타 스토리 카드 만들기" CTA rides along on the same line, instead of
-   the fixed bar it used to float in at the bottom of the screen. */
 .map-pane-topbar {
   display: flex;
   align-items: center;
@@ -65,23 +45,27 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  background: #ffffff;
-  border: 1.5px solid #f0ebe4;
+  background: var(--paper);
+  border: 2px solid var(--paper-edge);
   border-radius: 999px;
   padding: 0.45rem 1rem;
-  color: var(--navy);
+  color: var(--cocoa);
+  font-family: var(--font-body);
   font-weight: 600;
-  box-shadow: 0 6px 14px -8px rgba(45, 49, 66, 0.25);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 
 .timeline-back-arrow {
   line-height: 1;
+  color: var(--denim-deep);
 }
 
 .map-pane-topbar .timeline-back:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 18px -8px rgba(45, 49, 66, 0.3);
+  background: var(--denim-soft);
+  box-shadow: var(--shadow-md);
 }
 
 .map-pane .trip-map {
@@ -89,8 +73,7 @@
   max-height: 60vh;
 }
 
-/* Floats over the map while a no-GPS photo is waiting to be placed (see
-   TripMap's isPlacingLocation click mode). */
+/* Floats over the map while a no-GPS photo is waiting to be placed. */
 .location-picker-banner {
   position: absolute;
   left: 50%;
@@ -101,22 +84,22 @@
   align-items: center;
   gap: 0.6rem;
   max-width: calc(100% - 2.5rem);
-  background: var(--navy);
+  background: var(--ink);
   color: #fff;
   font-size: 0.82rem;
   border-radius: 999px;
   padding: 0.6rem 0.6rem 0.6rem 1rem;
-  box-shadow: 0 14px 28px -10px rgba(45, 49, 66, 0.5);
+  box-shadow: var(--shadow-lg);
 }
 
 .location-picker-banner strong {
-  color: var(--butter);
+  color: var(--honey);
 }
 
 .location-picker-cancel {
   flex: none;
   border: none;
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.16);
   color: #fff;
   font-size: 0.78rem;
   font-weight: 600;
@@ -127,7 +110,7 @@
 }
 
 .location-picker-cancel:hover {
-  background: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .route-strip {
@@ -137,14 +120,14 @@
   gap: 0.4rem;
   overflow-x: auto;
   padding: 0.75rem 0.6rem;
-  background: #ffffff;
-  border-radius: 16px;
-  border: 1.5px solid rgba(255, 107, 107, 0.14);
-  box-shadow: 0 10px 22px -16px rgba(45, 49, 66, 0.28);
+  background: var(--paper);
+  border-radius: var(--radius-sm);
+  border: 2px dashed var(--dash);
+  box-shadow: var(--shadow-sm);
 }
 
 .route-strip-arrow {
-  color: #b9c4e0;
+  color: var(--denim);
   font-size: 1rem;
   flex: none;
 }
@@ -155,11 +138,11 @@
   height: 48px;
   border-radius: 50%;
   padding: 0;
-  border: 2.5px solid #fff;
-  box-shadow: 0 0 0 2px var(--sky), 0 6px 12px -4px rgba(45, 49, 66, 0.25);
+  border: 2.5px solid var(--paper);
+  box-shadow: 0 0 0 2px var(--denim), var(--shadow-sm);
   overflow: hidden;
   cursor: pointer;
-  background: #fff;
+  background: var(--paper);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -168,11 +151,11 @@
 }
 
 .route-strip-pin--active {
-  box-shadow: 0 0 0 3px var(--coral), 0 8px 16px -4px rgba(255, 107, 107, 0.4);
+  box-shadow: 0 0 0 3px var(--honey-deep), 0 8px 16px -4px rgba(210, 155, 47, 0.45);
 }
 
 .route-strip-pin--no-gps {
-  box-shadow: 0 0 0 2px #d8d3e0, 0 6px 12px -4px rgba(45, 49, 66, 0.2);
+  box-shadow: 0 0 0 2px #cdc3b2, var(--shadow-sm);
   opacity: 0.7;
 }
 
@@ -181,22 +164,22 @@
   align-self: center;
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.45rem;
   border: none;
-  background: linear-gradient(135deg, var(--coral), var(--coral-dark));
-  color: #fff;
-  font-family: 'Jua', sans-serif;
-  font-size: 0.95rem;
-  padding: 0.75rem 1.75rem;
+  background: var(--honey);
+  color: var(--ink);
+  font-family: var(--font-head);
+  font-size: 0.98rem;
+  padding: 0.72rem 1.7rem;
   border-radius: 999px;
   cursor: pointer;
-  box-shadow: 0 10px 20px -6px rgba(255, 107, 107, 0.45);
+  box-shadow: 0 12px 22px -10px rgba(210, 155, 47, 0.7),
+    inset 0 -3px 0 rgba(160, 116, 33, 0.28);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .route-play-button:hover:not(:disabled) {
   transform: translateY(-2px) scale(1.02);
-  box-shadow: 0 12px 24px -6px rgba(255, 107, 107, 0.55);
 }
 
 .route-play-icon {
@@ -207,10 +190,9 @@
 
 .route-play-button:disabled {
   cursor: not-allowed;
-  opacity: 0.55;
+  opacity: 0.5;
   box-shadow: none;
 }
-
 
 /* ---- Timeline pane ---- */
 
@@ -230,40 +212,20 @@
   gap: 0.75rem;
 }
 
-.timeline-back {
-  align-self: flex-start;
-  border: none;
-  background: none;
-  color: #8a8fa3;
-  font-size: 0.85rem;
-  cursor: pointer;
-  padding: 0.2rem 0;
-}
-
-.timeline-back:hover {
-  color: var(--navy);
-}
-
-/* The "boarding pass" ticket card tying this screen back to the home
-   screen's washi-tape/ticket motif — a torn-stub layout (icon stub +
-   perforated divider with punched notches) instead of a plain rounded
-   card, so it reads as an actual ticket rather than a stats panel. */
+/* The "boarding pass" ticket card — torn-stub layout with a perforated tear
+   line, tying this screen to the home screen's washi-tape/ticket motif. */
 .trip-ticket {
   position: relative;
   display: flex;
   align-items: stretch;
-  background: #ffffff;
-  border-radius: 20px;
-  border: 1.5px solid rgba(255, 107, 107, 0.16);
-  box-shadow: 0 18px 36px -20px rgba(255, 107, 107, 0.3),
-    0 2px 0 rgba(45, 49, 66, 0.03);
+  background: var(--paper);
+  border-radius: var(--radius);
+  border: 2px dashed var(--dash);
+  box-shadow: var(--shadow-md);
   overflow: hidden;
   transform: rotate(-0.6deg);
 }
 
-/* Left "stub" section, like the tear-off half of a real ticket — a solid
-   coral block with the vertical TRIP TICKET label, separated from the
-   stats by the perforated divider below. */
 .trip-ticket-stub {
   flex: none;
   width: 74px;
@@ -273,7 +235,7 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 1rem 0.4rem;
-  background: linear-gradient(160deg, var(--coral), var(--coral-dark));
+  background: linear-gradient(160deg, var(--denim), var(--denim-deep));
   color: #fff;
 }
 
@@ -284,30 +246,26 @@
 .trip-ticket-stub-label {
   writing-mode: vertical-rl;
   text-orientation: mixed;
-  font-family: 'Jua', sans-serif;
+  font-family: var(--font-head);
   font-size: 0.72rem;
   letter-spacing: 0.12em;
   line-height: 1.3;
-  opacity: 0.92;
+  opacity: 0.95;
 }
 
-/* Punched-hole notches sitting on the perforated line between the stub and
-   the main panel — half circles cut out of both edges so the divider reads
-   as a tear line, the way a real ticket stub separates from the body. */
 .trip-ticket-notch {
   position: absolute;
   left: calc(74px - 9px);
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: var(--paper);
+  background: var(--cream);
   z-index: 3;
 }
 
 .trip-ticket-notch--top {
   top: -9px;
 }
-
 .trip-ticket-notch--bottom {
   bottom: -9px;
 }
@@ -317,16 +275,16 @@
   min-width: 0;
   position: relative;
   padding: 1.1rem 1.1rem 1rem 1.35rem;
-  border-left: 1.5px dashed #f2c9c9;
+  border-left: 2px dashed var(--dash-soft);
 }
 
 .trip-ticket-badge {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  font-family: 'Jua', sans-serif;
+  font-family: var(--font-head);
   font-size: 0.95rem;
-  color: var(--coral-dark);
+  color: var(--ink);
   margin-bottom: 0.85rem;
 }
 
@@ -336,24 +294,22 @@
   flex-wrap: wrap;
 }
 
-/* A stripe of unevenly-spaced bars under the stats, purely decorative —
-   mimics a boarding-pass barcode to sell the "ticket" read at a glance. */
 .trip-ticket-barcode {
   margin-top: 0.9rem;
   height: 22px;
   border-radius: 2px;
   background: repeating-linear-gradient(
     90deg,
-    var(--navy) 0,
-    var(--navy) 2px,
+    var(--cocoa) 0,
+    var(--cocoa) 2px,
     transparent 2px,
     transparent 4px,
-    var(--navy) 4px,
-    var(--navy) 5px,
+    var(--cocoa) 4px,
+    var(--cocoa) 5px,
     transparent 5px,
     transparent 9px,
-    var(--navy) 9px,
-    var(--navy) 12px,
+    var(--cocoa) 9px,
+    var(--cocoa) 12px,
     transparent 12px,
     transparent 14px
   );
@@ -366,21 +322,21 @@
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  background: var(--paper);
-  border: 1px solid #f0ebe4;
-  border-radius: 14px;
+  background: var(--cream);
+  border: 1.5px solid var(--paper-edge);
+  border-radius: var(--radius-sm);
   padding: 0.85rem 1rem;
 }
 
 .summary-stat-value {
-  font-family: 'Jua', sans-serif;
+  font-family: var(--font-head);
   font-size: 1.05rem;
-  color: var(--coral-dark);
+  color: var(--honey-deep);
 }
 
 .summary-stat-label {
   font-size: 0.72rem;
-  color: #a29db0;
+  color: var(--cocoa-soft);
 }
 
 .no-gps-chip {
@@ -388,12 +344,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.6rem;
-  border: 1.5px dashed #ffcf8a;
-  background: #fff8ec;
-  color: #a5731f;
+  border: 2px dashed var(--honey-deep);
+  background: var(--honey-soft);
+  color: #8a5a12;
   font-size: 0.85rem;
   font-weight: 600;
-  border-radius: 14px;
+  border-radius: var(--radius-sm);
   padding: 0.7rem 1rem;
   cursor: pointer;
   text-align: left;
@@ -410,7 +366,7 @@
   white-space: nowrap;
 }
 
-/* ---- Photo timeline (large photos, connected by a rail) ---- */
+/* ---- Photo timeline ---- */
 
 .photo-timeline {
   position: relative;
@@ -419,11 +375,6 @@
   gap: 1.4rem;
 }
 
-/* One continuous line the full height of the list, instead of a separate
-   segment per item — per-item segments only spanned each item's own box,
-   so the gap between cards (the flex `gap` above) broke the line into
-   visibly disconnected dashes. This sits behind the dots (z-index) and
-   runs from the first dot's center to the last one's. */
 .photo-timeline-rail-line {
   position: absolute;
   left: 9px;
@@ -432,8 +383,8 @@
   width: 2px;
   background: repeating-linear-gradient(
     to bottom,
-    #d8d3e0 0,
-    #d8d3e0 4px,
+    var(--dash) 0,
+    var(--dash) 4px,
     transparent 4px,
     transparent 9px
   );
@@ -455,7 +406,7 @@
 }
 
 .photo-timeline-item:focus-visible {
-  outline: 2px solid var(--sky);
+  outline: 2px solid var(--denim);
   outline-offset: 3px;
   border-radius: 12px;
 }
@@ -474,14 +425,14 @@
   height: 14px;
   margin-top: 14px;
   border-radius: 50%;
-  background: #fff;
-  border: 3px solid var(--sky);
-  box-shadow: 0 0 0 3px var(--paper);
+  background: var(--paper);
+  border: 3px solid var(--denim);
+  box-shadow: 0 0 0 3px var(--cream);
   transition: border-color 0.15s ease, transform 0.15s ease;
 }
 
 .photo-timeline-item--active .photo-timeline-dot {
-  border-color: var(--coral);
+  border-color: var(--honey-deep);
   transform: scale(1.15);
 }
 
@@ -490,40 +441,29 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  background: #ffffff;
-  border: 1.5px solid #f0ebe4;
-  border-radius: 20px;
+  background: var(--paper);
+  border: 2px dashed var(--dash);
+  border-radius: var(--radius);
   overflow: hidden;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease,
-    transform 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
 .photo-timeline-item:hover .photo-timeline-card {
-  border-color: rgba(77, 150, 255, 0.4);
+  border-color: var(--denim);
   transform: translateX(2px);
 }
 
 .photo-timeline-item--active .photo-timeline-card {
-  border-color: var(--coral);
-  box-shadow: 0 12px 26px -14px rgba(255, 107, 107, 0.5);
+  border-style: solid;
+  border-color: var(--honey-deep);
+  box-shadow: 0 12px 26px -14px rgba(210, 155, 47, 0.5);
 }
 
-/* Bigger than the old 56px thumbnail so the photo is actually visible, at a
-   fixed card height for a consistent-looking feed. Real photos (the
-   .photo-thumb-img case below) use object-fit: contain rather than cover —
-   cover was cropping portrait phone photos down to a sliver, cutting off
-   the actual subject; contain always shows the whole photo, letterboxed
-   (against the same background) on whichever side doesn't fill the box. */
-/* Sized so roughly two photos are visible in the timeline pane at once
-   instead of many small ones (vh-based so it scales with the actual
-   browser window, not a hardcoded breakpoint — a resized/half-width
-   desktop window is still a desktop, not the phone-sized viewport the
-   900px breakpoint elsewhere is really about). */
 .photo-timeline-photo {
   position: relative;
   width: 100%;
   height: 38vh;
-  background: #f5eeea;
+  background: var(--cream-sunk);
 }
 
 .photo-timeline-photo .photo-thumb-img {
@@ -552,7 +492,7 @@
   align-items: center;
   justify-content: center;
   font-size: 2.4rem;
-  background: linear-gradient(150deg, #fff0ee 0%, #ffe4c4 100%);
+  background: var(--honey-soft);
 }
 
 .photo-timeline-no-gps-badge {
@@ -561,9 +501,9 @@
   top: 0.6rem;
   font-size: 0.72rem;
   font-weight: 600;
-  color: #a5731f;
-  background: #fff8ec;
-  border: 1px solid #ffe1b8;
+  color: #8a5a12;
+  background: var(--honey-soft);
+  border: 1px solid var(--honey);
   border-radius: 999px;
   padding: 0.25rem 0.6rem;
 }
@@ -579,7 +519,7 @@
 .photo-timeline-time {
   font-weight: 600;
   font-size: 0.88rem;
-  color: var(--navy);
+  color: var(--ink);
 }
 
 .photo-timeline-location-row {
@@ -591,13 +531,13 @@
 
 .photo-timeline-location {
   font-size: 0.75rem;
-  color: #a29db0;
+  color: var(--cocoa-soft);
 }
 
 .photo-timeline-edit-location {
   border: none;
   background: none;
-  color: var(--sky-dark);
+  color: var(--link);
   font-size: 0.72rem;
   font-weight: 600;
   cursor: pointer;
@@ -607,21 +547,21 @@
 }
 
 .photo-timeline-edit-location:hover {
-  background: rgba(77, 150, 255, 0.12);
+  background: var(--denim-soft);
 }
 
-/* ---- Story-card CTA (sits on the map-pane topbar, next to 다시 시작) ---- */
+/* ---- Story-card CTA ---- */
 
 .floating-cta-button {
   border: none;
-  background: linear-gradient(135deg, var(--coral), var(--coral-dark));
-  color: #fff;
-  font-family: 'Jua', sans-serif;
+  background: var(--honey);
+  color: var(--ink);
+  font-family: var(--font-head);
   font-size: 0.9rem;
   padding: 0.65rem 1.4rem;
   border-radius: 999px;
   cursor: pointer;
-  box-shadow: 0 10px 20px -8px rgba(255, 107, 107, 0.55);
+  box-shadow: 0 12px 22px -10px rgba(210, 155, 47, 0.7);
   transition: transform 0.15s ease;
 }
 
@@ -634,7 +574,7 @@
 .no-gps-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(45, 49, 66, 0.45);
+  background: rgba(74, 52, 35, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -646,8 +586,9 @@
   width: min(420px, 100%);
   max-height: 80vh;
   overflow-y: auto;
-  background: #ffffff;
-  border-radius: 20px;
+  background: var(--paper);
+  border-radius: var(--radius);
+  border: 2px dashed var(--dash);
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
@@ -656,15 +597,15 @@
 
 .no-gps-modal-title {
   margin: 0;
-  font-family: 'Jua', sans-serif;
+  font-family: var(--font-head);
   font-size: 1.1rem;
-  color: var(--navy);
+  color: var(--ink);
 }
 
 .no-gps-modal-desc {
   margin: 0;
   font-size: 0.85rem;
-  color: #8a8fa3;
+  color: var(--cocoa-soft);
   line-height: 1.5;
 }
 
@@ -682,8 +623,8 @@
   align-items: center;
   gap: 0.7rem;
   width: 100%;
-  border: 1.5px solid #f0ebe4;
-  background: #ffffff;
+  border: 1.5px solid var(--paper-edge);
+  background: var(--paper);
   border-radius: 12px;
   padding: 0.5rem 0.7rem;
   cursor: pointer;
@@ -694,8 +635,8 @@
 }
 
 .no-gps-modal-item:hover {
-  border-color: var(--sky);
-  background: #f0f6ff;
+  border-color: var(--denim);
+  background: var(--denim-soft);
 }
 
 .no-gps-modal-thumb {
@@ -711,7 +652,7 @@
   flex-direction: column;
   gap: 0.1rem;
   font-size: 0.82rem;
-  color: var(--navy);
+  color: var(--ink);
   min-width: 0;
   flex: 1;
 }
@@ -724,21 +665,21 @@
 
 .no-gps-modal-item-time {
   font-size: 0.72rem;
-  color: #a29db0;
+  color: var(--cocoa-soft);
 }
 
 .no-gps-modal-item-cta {
   flex: none;
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--sky-dark);
+  color: var(--link);
   white-space: nowrap;
 }
 
 .no-gps-modal-close {
   align-self: flex-end;
   border: none;
-  background: var(--navy);
+  background: var(--ink);
   color: #fff;
   font-size: 0.85rem;
   font-weight: 600;
@@ -762,7 +703,7 @@
 
   .map-pane {
     border-right: none;
-    border-bottom: 1px solid rgba(45, 49, 66, 0.06);
+    border-bottom: 2px dashed var(--dash-soft);
     flex: none;
     min-height: 460px;
   }

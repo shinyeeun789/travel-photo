@@ -9,8 +9,6 @@ import {
 } from 'maplibre-gl';
 import { Protocol } from 'pmtiles';
 import { haversineDistanceKm } from '../utils/geo';
-import walkerFrame1 from '../assets/walker1.png';
-import walkerFrame2 from '../assets/walker2.png';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './TripMap.css';
 
@@ -28,11 +26,28 @@ const MIN_LABEL_ZOOM = 13;
 const SHORT_TRIP_ZOOM_BOOST = 1.2;
 const ZOOM_BOOST_STEP = 0.1;
 
-// Two walking poses, swapped on a timer during route playback — a simple
-// 2-frame walk cycle so the mascot's legs actually alternate as it moves,
-// instead of one static pose sliding along the route.
-const WALK_FRAMES = [walkerFrame1, walkerFrame2];
-const WALK_FRAME_INTERVAL_MS = 220;
+// Route playback stamps a trail of paw prints along the path instead of
+// moving 토리 along it. Prints are dropped at a fixed on-screen spacing as
+// the traveled distance advances; PAW_SPACING_PX is that spacing, MAX_PAWS
+// caps the DOM node count on very long routes (spacing widens to fit). The
+// whole trail is cleared when playback ends (see the effect cleanup).
+// Spacing is deliberately wide — each print should sit on its own with a
+// clear gap, so the paw shape actually reads instead of blurring into a
+// dotted line.
+const PAW_SPACING_PX = 52;
+const MAX_PAWS = 70;
+
+// Inlined (not an <img>) so its fill follows `currentColor` — the pink set
+// on .trip-map-paw-shape in TripMap.css. Toes point "up" (−y); dropPaw
+// rotates the whole mark to the route's local heading. Chunky beans that
+// overlap the heel pad so it stays unmistakably a paw even ~20px wide.
+const PAW_SVG = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" fill="currentColor" aria-hidden="true">
+<ellipse cx="23" cy="42" rx="12" ry="15.5" transform="rotate(-20 23 42)"/>
+<ellipse cx="42" cy="24" rx="12.5" ry="16.5" transform="rotate(-7 42 24)"/>
+<ellipse cx="60" cy="24" rx="12.5" ry="16.5" transform="rotate(7 60 24)"/>
+<ellipse cx="79" cy="42" rx="12" ry="15.5" transform="rotate(20 79 42)"/>
+<path d="M50 40c16 0 27 10 27 25 0 16-12 27-27 27s-27-11-27-27c0-15 11-25 27-25z"/>
+</svg>`;
 
 // Symbol layers with text collision detection — MapLibre recomputes label
 // placement on every camera change, which is the main cost of panning the
@@ -272,14 +287,14 @@ function buildLayersForSource(sourceId) {
       type: 'fill',
       source: sourceId,
       'source-layer': 'water',
-      paint: { 'fill-color': '#cfe3ff', 'fill-opacity': ZOOM_FADE_OPACITY },
+      paint: { 'fill-color': '#d6e7f3', 'fill-opacity': ZOOM_FADE_OPACITY },
     },
     {
       id: src('waterway'),
       type: 'line',
       source: sourceId,
       'source-layer': 'waterway',
-      paint: { 'line-color': '#cfe3ff', 'line-width': 1 },
+      paint: { 'line-color': '#c4dcee', 'line-width': 1 },
     },
     {
       id: src('boundary'),
@@ -374,8 +389,8 @@ function buildLayersForSource(sourceId) {
         'text-size': 11,
       },
       paint: {
-        'text-color': '#6b6455',
-        'text-halo-color': '#ffffff',
+        'text-color': '#7a5c42',
+        'text-halo-color': '#fffdf6',
         'text-halo-width': 1.8,
       },
     },
@@ -395,8 +410,8 @@ function buildLayersForSource(sourceId) {
         'text-anchor': 'top',
       },
       paint: {
-        'text-color': '#e8524f',
-        'text-halo-color': '#ffffff',
+        'text-color': '#3f7bab',
+        'text-halo-color': '#fffdf6',
         'text-halo-width': 1.8,
       },
     },
@@ -413,8 +428,8 @@ function buildLayersForSource(sourceId) {
         'text-size': 13,
       },
       paint: {
-        'text-color': '#2d3142',
-        'text-halo-color': '#ffffff',
+        'text-color': '#4a3423',
+        'text-halo-color': '#fffdf6',
         'text-halo-width': 2,
       },
     },
@@ -486,7 +501,7 @@ function buildStyle() {
       {
         id: 'background',
         type: 'background',
-        paint: { 'background-color': '#fbf9f5' },
+        paint: { 'background-color': '#fbf3e2' },
       },
       ...buildLayersForSource('korea'),
       ...buildLayersForSource('japan'),
@@ -559,39 +574,75 @@ const ROUTE_SOURCE_ID = 'trip-route';
 const ROUTE_LAYER_ID = 'trip-route-line';
 const ROUTE_SAMPLES_PER_SEGMENT = 24;
 
-function catmullRomPoint(p0, p1, p2, p3, t) {
-  const t2 = t * t;
-  const t3 = t2 * t;
-  const x =
-    0.5 *
-    (2 * p1[0] +
-      (-p0[0] + p2[0]) * t +
-      (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 +
-      (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3);
-  const y =
-    0.5 *
-    (2 * p1[1] +
-      (-p0[1] + p2[1]) * t +
-      (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 +
-      (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3);
-  return [x, y];
+// Each leg of the route gets a gentle arch (see catmullRomSpline) so the
+// whole path reads as a flowing curved journey line even when the photos'
+// GPS points fall in a near-straight line — the raw spline through such
+// points is visually straight, worst of all on the first/last leg. Arch
+// height is CURVE_ARCH_RATIO of the leg's own length, capped at
+// CURVE_ARCH_MAX_KM so a cross-island leg doesn't balloon, and it
+// alternates side leg-to-leg for a hand-drawn "dotted trail" look.
+const CURVE_ARCH_RATIO = 0.13;
+const CURVE_ARCH_MAX_KM = 1.6;
+const KM_PER_DEG_LAT = 110.574;
+
+// One point on a centripetal Catmull-Rom segment p1→p2 (u in [0,1]).
+// Centripetal (α=0.5) parametrization rather than uniform: uniform
+// Catmull-Rom overshoots — loops out past the stops — when the stops are
+// unevenly spaced (visible kink on the Jeju sample). Centripetal knot
+// spacing removes that. Barry–Goldman pyramidal form; knot deltas are
+// floored so coincident points can't divide by zero.
+function centripetalPoint(p0, p1, p2, p3, u) {
+  const knot = (t, a, b) =>
+    t + Math.pow(Math.max(Math.hypot(b[0] - a[0], b[1] - a[1]), 1e-6), 0.5);
+  const t0 = 0;
+  const t1 = knot(t0, p0, p1);
+  const t2 = knot(t1, p1, p2);
+  const t3 = knot(t2, p2, p3);
+  const t = t1 + (t2 - t1) * u;
+  const lerp = (a, b, ta, tb) => {
+    const w = (tb - t) / (tb - ta);
+    return [a[0] * w + b[0] * (1 - w), a[1] * w + b[1] * (1 - w)];
+  };
+  const A1 = lerp(p0, p1, t0, t1);
+  const A2 = lerp(p1, p2, t1, t2);
+  const A3 = lerp(p2, p3, t2, t3);
+  const B1 = lerp(A1, A2, t0, t2);
+  const B2 = lerp(A2, A3, t1, t3);
+  return lerp(B1, B2, t1, t2);
 }
 
-// Smooth curve through the stops (Catmull-Rom spline) instead of straight
-// point-to-point segments — matches the "부드럽게 잇는 곡선" the user asked
-// for, computed purely client-side from the photos' own GPS coordinates
-// (no routing service, no cost, doesn't follow real roads).
+// Smooth curve through the stops (centripetal Catmull-Rom + a per-leg
+// arch) instead of straight point-to-point segments — matches the
+// "부드럽게 잇는 곡선" / "둥그렇게" the user asked for, computed purely
+// client-side from the photos' own GPS coordinates (no routing service, no
+// cost, doesn't follow real roads).
 //
 // Sampled at equal *arc-length* (real distance) intervals rather than
-// equal curve-parameter steps. Catmull-Rom curves don't move at constant
-// speed with respect to their parameter — near a bend, equal parameter
-// steps can cover very different real distances. Since the route-play
-// animation maps elapsed time linearly onto sample index, parameter-even
-// sampling made the marker visibly speed up and slow down along the way;
-// distance-even sampling keeps its screen speed constant instead.
+// equal curve-parameter steps. The curve doesn't move at constant speed
+// with respect to its parameter — near a bend, equal parameter steps can
+// cover very different real distances. Since the route-play animation maps
+// elapsed time linearly onto sample index, parameter-even sampling made
+// playback visibly speed up and slow down along the way; distance-even
+// sampling keeps its on-screen speed constant instead.
 function catmullRomSpline(points, samplesPerSegment) {
   if (points.length < 2) return points.slice();
-  const at = (i) => points[Math.max(0, Math.min(points.length - 1, i))];
+  // Reflected phantom points past each end (rather than clamping to the
+  // endpoint) so the first and last legs get a real tangent and can arch
+  // like the middle ones, and so the centripetal knot spacing never sees a
+  // zero-length end gap.
+  const at = (i) => {
+    if (i < 0) {
+      return [2 * points[0][0] - points[1][0], 2 * points[0][1] - points[1][1]];
+    }
+    if (i >= points.length) {
+      const n = points.length;
+      return [
+        2 * points[n - 1][0] - points[n - 2][0],
+        2 * points[n - 1][1] - points[n - 2][1],
+      ];
+    }
+    return points[i];
+  };
   const FINE_STEPS_PER_SAMPLE = 20;
   const result = [];
 
@@ -601,6 +652,29 @@ function catmullRomSpline(points, samplesPerSegment) {
     const p2 = at(i + 1);
     const p3 = at(i + 2);
 
+    // Perpendicular to this leg's chord, in a locally-equal-aspect planar
+    // space (longitude scaled by cos(lat)) so the arch looks symmetric on
+    // screen rather than skewed by the lng/lat aspect ratio at this
+    // latitude. The arch itself is a cosine bump: zero at both stops with
+    // zero slope there, so it adds bulge to the middle of the leg without
+    // disturbing where the curve meets each stop.
+    const latMid = (p1[1] + p2[1]) / 2;
+    const cosLat = Math.cos((latMid * Math.PI) / 180) || 1e-6;
+    const chordPlanar = Math.hypot(
+      (p2[0] - p1[0]) * cosLat,
+      p2[1] - p1[1]
+    );
+    let perpX = 0;
+    let perpY = 0;
+    if (chordPlanar > 1e-9) {
+      perpX = -(p2[1] - p1[1]) / chordPlanar;
+      perpY = ((p2[0] - p1[0]) * cosLat) / chordPlanar;
+    }
+    const chordKm = haversineDistanceKm(p1[1], p1[0], p2[1], p2[0]);
+    const archDeg =
+      Math.min(chordKm * CURVE_ARCH_RATIO, CURVE_ARCH_MAX_KM) / KM_PER_DEG_LAT;
+    const archSide = i % 2 === 0 ? 1 : -1;
+
     // Densely sample this segment first, purely to measure real distance
     // along the curve — this is what lets us find equal-distance points
     // afterward, which the curve's own math can't give us directly.
@@ -608,7 +682,11 @@ function catmullRomSpline(points, samplesPerSegment) {
     const finePoints = [];
     const cumulativeDist = [0];
     for (let s = 0; s <= fineCount; s++) {
-      const pt = catmullRomPoint(p0, p1, p2, p3, s / fineCount);
+      const u = s / fineCount;
+      const base = centripetalPoint(p0, p1, p2, p3, u);
+      const bump = (1 - Math.cos(2 * Math.PI * u)) / 2;
+      const off = archDeg * bump * archSide;
+      const pt = [base[0] + (perpX * off) / cosLat, base[1] + perpY * off];
       finePoints.push(pt);
       if (s > 0) {
         const prev = finePoints[s - 1];
@@ -663,11 +741,12 @@ function TripMap({
   const routeStopsRef = useRef({ photoIds: [], coords: [] });
   const stampMarkersRef = useRef({});
   const stampUrlsRef = useRef({});
+  const pawMarkersRef = useRef([]);
 
-  // Removes every photo "stamp" placed by the route-play animation and
-  // revokes the object URLs it created for them — shared by the unmount
-  // cleanup and by the pin-rebuild effect (a fresh set of photos/positions
-  // makes any previous stamps stale).
+  // Removes every photo "stamp" and paw print placed by the route-play
+  // animation and revokes the object URLs it created for the stamps —
+  // shared by the unmount cleanup and by the pin-rebuild effect (a fresh
+  // set of photos/positions makes any previous marks stale).
   const clearStamps = useCallback(() => {
     Object.values(stampMarkersRef.current).forEach((m) => m.remove());
     stampMarkersRef.current = {};
@@ -675,6 +754,8 @@ function TripMap({
       URL.revokeObjectURL(url)
     );
     stampUrlsRef.current = {};
+    pawMarkersRef.current.forEach((m) => m.remove());
+    pawMarkersRef.current = [];
   }, []);
 
   useEffect(() => {
@@ -792,7 +873,10 @@ function TripMap({
           // the round cap as an evenly-spaced dot).
           layout: { 'line-cap': 'round', 'line-join': 'round' },
           paint: {
-            'line-color': '#4d96ff',
+            // Soft warm taupe — a "trail on the ground" read that sits
+            // quietly under the pink paw prints during playback, rather
+            // than the harder denim blue.
+            'line-color': '#c7ac83',
             'line-width': 3,
             'line-dasharray': [0, 2],
             'line-opacity': 0.75,
@@ -949,6 +1033,10 @@ function TripMap({
       }
     });
 
+    // The dotted route line stays visible through playback — it reads as
+    // the faint "trail on the ground" that the pink paw prints are stamped
+    // along, then it's all that's left once the prints clear at the end.
+
     // Keep the user from panning/zooming away mid-flythrough — the camera
     // is already driving itself via easeTo below, and a manual drag/scroll
     // while that's happening fights it (the next easeTo call just yanks the
@@ -1043,44 +1131,91 @@ function TripMap({
       requestAnimationFrame(() => el.classList.add('trip-map-stamp--landed'));
     };
 
-    const travelEl = document.createElement('div');
-    travelEl.className = 'trip-map-travel-marker';
-    // Separate element for the left/right flip (see the direction check in
-    // step() below) — the walking bob animation already owns `transform`
-    // on the img itself (a CSS animation replaces the whole property, so
-    // it can't share it with a plain toggled style), and this one can't
-    // carry it either since MapLibre writes the position transform
-    // directly onto travelEl every frame.
-    const travelFlip = document.createElement('div');
-    travelFlip.className = 'trip-map-travel-marker-flip';
-    const travelShape = document.createElement('img');
-    travelShape.className = 'trip-map-travel-marker-shape';
-    travelShape.src = WALK_FRAMES[0];
-    travelShape.alt = '';
-    travelFlip.appendChild(travelShape);
-    travelEl.appendChild(travelFlip);
-    let lastWalkFrame = 0;
-    let facingRight = false;
-    const travelMarker = new Marker({ element: travelEl, anchor: 'bottom' })
-      .setLngLat(spline[0])
-      .addTo(map);
-
-    // The marker starts exactly at stop 1's coordinates, but the camera is
-    // still wherever the overview left it (typically the framed cluster's
-    // centroid, not stop 1) — without snapping it here first, the first leg's
-    // easeTo below starts from that mismatched position, so the marker
-    // visibly jumps relative to the view for the first ~second while the
-    // camera catches up. Measured up to ~400px of drift at launch before
-    // this fix. Also pins the zoom back to the initial overview level —
-    // without this the flythrough starts from whatever zoom the map
-    // happened to be at (e.g. still zoomed into whichever photo the user
-    // had selected before hitting play), instead of the same framing the
-    // trip was first shown at.
+    // Snap the camera to stop 1 at the overview zoom before the first leg's
+    // easeTo. The overview left the camera at the framed cluster's centroid
+    // (not stop 1) and possibly at a different zoom (e.g. zoomed into
+    // whichever photo was selected before play) — starting the first easeTo
+    // from that mismatch made the route visibly slide/zoom under the view
+    // for the first ~second while the camera caught up.
     const playbackZoom = overviewZoomRef.current ?? map.getZoom();
     map.jumpTo({ center: spline[0], zoom: playbackZoom });
 
+    // --- Paw-print trail -------------------------------------------------
+    // Cumulative real distance to each spline vertex, so the animation can
+    // map "time elapsed" (via the leg model below) onto "distance traveled"
+    // and drop a print every fixed interval of that distance.
+    const splineCumKm = [0];
+    for (let i = 1; i < spline.length; i++) {
+      const [ax, ay] = spline[i - 1];
+      const [bx, by] = spline[i];
+      splineCumKm.push(
+        splineCumKm[i - 1] + haversineDistanceKm(ay, ax, by, bx)
+      );
+    }
+    const routeLengthKm = splineCumKm[splineCumKm.length - 1];
+
+    // Target on-screen spacing → a real-world distance at the (fixed)
+    // playback zoom, widened if MAX_PAWS prints couldn't otherwise span the
+    // whole route.
+    const centerPx = map.project(map.getCenter());
+    const spanA = map.unproject([centerPx.x, centerPx.y]);
+    const spanB = map.unproject([centerPx.x + PAW_SPACING_PX, centerPx.y]);
+    const pawSpacingKm = Math.max(
+      haversineDistanceKm(spanA.lat, spanA.lng, spanB.lat, spanB.lng),
+      routeLengthKm / MAX_PAWS
+    );
+    let nextPawKm = pawSpacingKm * 0.5;
+
+    // Stamps one paw print at `distKm` along the spline — rotated to the
+    // route's local heading, and nudged to alternating sides of the
+    // centerline for a left/right walking-trail read. The trail lives only
+    // for the duration of playback (cleared in the effect cleanup).
+    const dropPaw = (distKm) => {
+      let lo = 0;
+      let hi = splineCumKm.length - 1;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (splineCumKm[mid] < distKm) lo = mid + 1;
+        else hi = mid;
+      }
+      const i1 = Math.max(1, lo);
+      const i0 = i1 - 1;
+      const segKm = splineCumKm[i1] - splineCumKm[i0] || 1e-9;
+      const f = Math.min(1, Math.max(0, (distKm - splineCumKm[i0]) / segKm));
+      const a = spline[i0];
+      const b = spline[i1];
+      const lng = a[0] + (b[0] - a[0]) * f;
+      const lat = a[1] + (b[1] - a[1]) * f;
+      // Screen-space heading of the a→b segment (map is north-up). The paw
+      // art points "up", so this angle aims its toes down the route.
+      const latRad = (lat * Math.PI) / 180;
+      const angleDeg =
+        (Math.atan2((b[0] - a[0]) * Math.cos(latRad), b[1] - a[1]) * 180) /
+        Math.PI;
+      const index = pawMarkersRef.current.length;
+      const el = document.createElement('div');
+      el.className = 'trip-map-paw';
+      el.style.setProperty('--paw-angle', `${angleDeg}deg`);
+      el.style.setProperty('--paw-off', index % 2 === 0 ? '4px' : '-4px');
+      const rot = document.createElement('div');
+      rot.className = 'trip-map-paw-rot';
+      const shape = document.createElement('div');
+      shape.className = 'trip-map-paw-shape';
+      shape.innerHTML = PAW_SVG;
+      rot.appendChild(shape);
+      el.appendChild(rot);
+      const marker = new Marker({ element: el, anchor: 'center' })
+        .setLngLat([lng, lat])
+        .addTo(map);
+      pawMarkersRef.current.push(marker);
+      // Post-mount so the press-in transition actually runs (see
+      // .trip-map-paw--landed) instead of starting in its end state.
+      requestAnimationFrame(() => el.classList.add('trip-map-paw--landed'));
+    };
+    // -------------------------------------------------------------------
+
     // Every leg drives off the same constant real-world speed, so the
-    // marker's pace never visibly changes from one leg to the next. (An
+    // trail's pace never visibly changes from one leg to the next. (An
     // earlier version derived each leg's duration from a fixed overall
     // total, then floored short legs up to a minimum duration so they
     // wouldn't flash by instantly — but that floor made short legs slower
@@ -1230,7 +1365,7 @@ function TripMap({
         // either in the same frame the boundary is crossed piled expensive
         // work onto that frame, which is what read as a "드드득" hitch right
         // as each stop's photo popped in. Pushing both to the very next
-        // frame keeps this frame to just the cheap position update below.
+        // frame keeps this frame to just the cheap paw-distance check below.
         requestAnimationFrame(() => {
           onSelectPhoto?.(stops.photoIds[legToStamp]);
           stampStop(legToStamp);
@@ -1243,44 +1378,25 @@ function TripMap({
         0,
         Math.min(1, legElapsed / legDurationsMs[currentLeg])
       );
-      // Only ROUTE_SAMPLES_PER_SEGMENT samples per leg, but a leg plays
-      // over dozens of frames — snapping to the nearest sample left the
-      // marker sitting still for several frames before jumping to the
-      // next one, which read as a juddery "드드드득" stepping motion.
-      // Interpolating between the two samples straddling the current
-      // moment moves it continuously every single frame instead.
+      // Fractional spline-vertex index of the current position → the real
+      // distance traveled so far. Drop a paw print for every spacing
+      // interval newly crossed (hard-capped at MAX_PAWS). Sub-sample
+      // interpolation here keeps the drop points smooth even though a leg
+      // only has ROUTE_SAMPLES_PER_SEGMENT samples.
       const scaledLocal = legT * ROUTE_SAMPLES_PER_SEGMENT;
-      const localIndex = Math.min(
-        ROUTE_SAMPLES_PER_SEGMENT - 1,
-        Math.floor(scaledLocal)
-      );
-      const frac = scaledLocal - localIndex;
       const base = currentLeg * ROUTE_SAMPLES_PER_SEGMENT;
-      const p0 = spline[Math.min(spline.length - 1, base + localIndex)];
-      const p1 = spline[Math.min(spline.length - 1, base + localIndex + 1)];
-      const pos = [
-        p0[0] + (p1[0] - p0[0]) * frac,
-        p0[1] + (p1[1] - p0[1]) * frac,
-      ];
-      travelMarker.setLngLat(pos);
-
-      // The art faces left by default — flip it for the stretch of the
-      // route currently heading east (increasing longitude = rightward on
-      // screen, since the map is always shown north-up). Uses the same
-      // p0→p1 segment already computed above rather than tracking a
-      // separate previous-position, so it needs no extra state and is
-      // never wrong on the very first frame.
-      const movingRight = p1[0] - p0[0] > 0;
-      if (movingRight !== facingRight) {
-        facingRight = movingRight;
-        travelFlip.style.transform = facingRight ? 'scaleX(-1)' : '';
-      }
-
-      const walkFrame =
-        Math.floor(elapsed / WALK_FRAME_INTERVAL_MS) % WALK_FRAMES.length;
-      if (walkFrame !== lastWalkFrame) {
-        lastWalkFrame = walkFrame;
-        travelShape.src = WALK_FRAMES[walkFrame];
+      const globalFloat = Math.min(spline.length - 1, base + scaledLocal);
+      const gi0 = Math.floor(globalFloat);
+      const gi1 = Math.min(spline.length - 1, gi0 + 1);
+      const traveledKm =
+        splineCumKm[gi0] +
+        (splineCumKm[gi1] - splineCumKm[gi0]) * (globalFloat - gi0);
+      while (
+        nextPawKm <= traveledKm &&
+        pawMarkersRef.current.length < MAX_PAWS
+      ) {
+        dropPaw(nextPawKm);
+        nextPawKm += pawSpacingKm;
       }
 
       if (t >= 1 && currentLeg === numLegs - 1) {
@@ -1298,7 +1414,10 @@ function TripMap({
 
     return () => {
       cancelAnimationFrame(rafId);
-      travelMarker.remove();
+      // The paw trail exists only while playback is running — clear it when
+      // playback ends (or unmounts). The dotted route line was never hidden.
+      pawMarkersRef.current.forEach((m) => m.remove());
+      pawMarkersRef.current = [];
       LABEL_LAYER_IDS.forEach((id) => {
         if (map.getLayer(id)) {
           map.setLayoutProperty(id, 'text-allow-overlap', false);

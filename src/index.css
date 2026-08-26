@@ -1,8 +1,67 @@
+/* ==========================================================================
+   트립루트 — design system
+   Built around the mascot "토리": a travel-loving puppy in a butter-yellow
+   bucket hat and a denim-blue neckerchief, drawn in a soft, hand-inked
+   scrapbook style. The whole UI borrows that character sheet's language:
+   warm cream paper, dashed rounded frames, hand-drawn underlines, little
+   doodle stickers (clouds, paw prints, dotted flight paths).
+   ========================================================================== */
+
+:root {
+  /* --- paper & surfaces --- */
+  --cream: #fbf3e2;          /* page background */
+  --cream-sunk: #f3e7cd;     /* insets, tracks, sunken wells */
+  --paper: #fffdf6;          /* cards, sheets */
+  --paper-edge: #ece0c6;     /* hairline around paper cards */
+
+  /* --- brand accents, straight off 토리 --- */
+  --honey: #f4cd66;          /* the bucket hat — primary accent */
+  --honey-deep: #d29b2f;     /* honey that's safe on cream for large text */
+  --honey-soft: #fbe9bd;     /* honey tint fill */
+  --denim: #6ea9d6;          /* the neckerchief — secondary accent */
+  --denim-deep: #3f7bab;     /* denim safe on cream for large text */
+  --denim-soft: #dcebf6;     /* denim tint fill */
+  --sage: #9aad68;           /* the backpack — nature / route accent */
+  --sage-deep: #728a45;
+  --sage-soft: #e7edd4;
+  --blush: #f0b1ab;          /* 토리's cheeks — tiny warm punctuation */
+
+  /* --- ink --- */
+  --ink: #4a3423;            /* headings, strongest text */
+  --cocoa: #6a4a33;          /* body text, drawn outlines */
+  --cocoa-soft: #9a8064;     /* captions, muted meta */
+  --link: #37658c;           /* denim, darkened to pass on cream */
+
+  /* --- utility --- */
+  --dash: rgba(106, 74, 51, 0.30);      /* dashed frame stroke */
+  --dash-soft: rgba(106, 74, 51, 0.16);
+  --shadow-sm: 0 4px 14px -6px rgba(106, 74, 51, 0.22);
+  --shadow-md: 0 14px 30px -14px rgba(106, 74, 51, 0.32);
+  --shadow-lg: 0 24px 46px -18px rgba(106, 74, 51, 0.36);
+
+  --radius-sm: 14px;
+  --radius: 20px;
+  --radius-lg: 28px;
+
+  --font-head: 'Jua', 'Gaegu', 'Gowun Dodum', -apple-system, sans-serif;
+  --font-hand: 'Gaegu', 'Jua', 'Gowun Dodum', sans-serif;
+  --font-body: 'Gowun Dodum', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    sans-serif;
+
+  /* legacy aliases — a few rules across the app still reference these names */
+  --paper-legacy: var(--cream);
+  --navy: var(--ink);
+}
+
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: var(--font-body);
+  color: var(--cocoa);
+  background: var(--cream);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -10,4 +69,129 @@ body {
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
+}
+
+/* --------------------------------------------------------------------------
+   Shared motif utilities — the pieces that give every screen the same
+   "torn out of a travel journal" feel.
+   -------------------------------------------------------------------------- */
+
+/* Dashed rounded frame, exactly like the panels on the character sheet. */
+.tori-frame {
+  border: 2px dashed var(--dash);
+  border-radius: var(--radius-lg);
+  background: var(--paper);
+}
+
+/* Section heading with the little upright tab: ▎ 다양한 표정 */
+.tori-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-family: var(--font-head);
+  font-weight: 400;
+  font-size: 0.98rem;
+  color: var(--ink);
+  letter-spacing: 0.01em;
+}
+.tori-eyebrow::before {
+  content: '';
+  flex: none;
+  width: 5px;
+  height: 1.1em;
+  border-radius: 3px;
+  background: var(--honey-deep);
+}
+
+/* Hand-drawn underline that sits under a heading's baseline. Apply to a
+   span wrapping the word(s) you want stroked. */
+.tori-stroke {
+  position: relative;
+  display: inline-block;
+}
+.tori-stroke::after {
+  content: '';
+  position: absolute;
+  left: -0.1em;
+  right: -0.1em;
+  bottom: -0.18em;
+  height: 0.42em;
+  background: no-repeat center / 100% 100%
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='12' viewBox='0 0 120 12'%3E%3Cpath d='M2 7C22 3 44 3 60 6s40 4 58-1' fill='none' stroke='%236ea9d6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E");
+  pointer-events: none;
+}
+.tori-stroke--honey::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='12' viewBox='0 0 120 12'%3E%3Cpath d='M2 7C22 3 44 3 60 6s40 4 58-1' fill='none' stroke='%23f0c14b' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+/* Pill button family. */
+.tori-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border: none;
+  border-radius: 999px;
+  font-family: var(--font-head);
+  font-weight: 400;
+  font-size: 1.02rem;
+  padding: 0.82rem 2rem;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.tori-btn--primary {
+  background: var(--honey);
+  color: var(--ink);
+  box-shadow: 0 12px 22px -10px rgba(210, 155, 47, 0.7),
+    inset 0 -3px 0 rgba(160, 116, 33, 0.28);
+}
+.tori-btn--primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 28px -10px rgba(210, 155, 47, 0.78),
+    inset 0 -3px 0 rgba(160, 116, 33, 0.28);
+}
+.tori-btn--primary:active {
+  transform: translateY(0);
+}
+.tori-btn--ghost {
+  background: var(--paper);
+  color: var(--cocoa);
+  border: 2px solid var(--denim-soft);
+  box-shadow: var(--shadow-sm);
+}
+.tori-btn--ghost:hover {
+  background: var(--denim-soft);
+  transform: translateY(-1px);
+}
+.tori-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Chip: small rounded tag used for feature callouts / meta. */
+.tori-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  color: var(--cocoa);
+  background: var(--paper);
+  border: 1.5px solid var(--paper-edge);
+  border-radius: 999px;
+  padding: 0.42rem 0.9rem;
+  box-shadow: var(--shadow-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

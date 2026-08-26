@@ -1,6 +1,11 @@
 import React, { useCallback, useRef, useState } from 'react';
 import exifr from 'exifr';
 import AppHeader from './AppHeader';
+import logo from '../assets/logo.png';
+import mascotHero from '../assets/mascot-hero.png';
+import cameraIcon from '../assets/camera.png';
+import toriHuh from '../assets/tori-huh.png';
+import { Cloud, Plane, Paw, Sparkle, DottedPath } from './Doodles';
 import './HomeScreen.css';
 
 const MIN_PHOTOS = 5;
@@ -109,26 +114,38 @@ function HomeScreen({ onPhotosParsed, onSampleTrip, onGoHome }) {
 
       <main className="hero-section">
         <div className="hero-decor" aria-hidden="true">
-          <span className="hero-decor-item hero-decor-item--1">📍</span>
-          <span className="hero-decor-item hero-decor-item--2">🧭</span>
-          <span className="hero-decor-item hero-decor-item--3">🌴</span>
-          <span className="hero-decor-item hero-decor-item--4">🎞️</span>
+          <Cloud size={54} className="hero-decor-item hero-decor-item--cloud1" />
+          <Cloud size={38} className="hero-decor-item hero-decor-item--cloud2" />
+          <Plane size={30} className="hero-decor-item hero-decor-item--plane" />
+          <Paw size={24} className="hero-decor-item hero-decor-item--paw1" />
+          <Paw size={18} className="hero-decor-item hero-decor-item--paw2" />
+          <Sparkle size={20} className="hero-decor-item hero-decor-item--sparkle" />
         </div>
 
-        <div className="hero-heading">
-          <span className="hero-heading-eyebrow">
-            ✨ 업로드만 하면 자동으로 완성돼요
-          </span>
-          <h1 className="hero-heading-title">
-            사진 몇 장으로 완성하는 나만의 여행 지도
-          </h1>
+        <div className="hero-intro">
+          <div className="hero-mascot">
+            <img src={mascotHero} alt="여행 갈 준비를 마친 강아지 토리" />
+          </div>
+          <div className="hero-heading">
+            <p className="hero-heading-eyebrow">
+              <Sparkle size={14} aria-hidden="true" />
+              업로드만 하면 토리가 알아서 그려줘요
+            </p>
+            <h1 className="hero-heading-title">
+              사진 몇 장으로 완성하는
+              <br />
+              <span className="tori-stroke">나만의 여행 지도</span>
+            </h1>
+            <p className="hero-heading-sub">
+              새로운 곳을 발견하고, 사진 찍는 것도 좋아하는 강아지 토리와
+              함께 지난 여행을 다시 걸어봐요.
+            </p>
+          </div>
         </div>
 
         <div className="ticket-wrapper">
           <span className="washi-tape washi-tape--left" aria-hidden="true" />
           <span className="washi-tape washi-tape--right" aria-hidden="true" />
-          <span className="ticket-wrapper-notch ticket-wrapper-notch--left" aria-hidden="true" />
-          <span className="ticket-wrapper-notch ticket-wrapper-notch--right" aria-hidden="true" />
           <div
             className={`drop-zone${isDragging ? ' drop-zone--dragging' : ''}`}
             onDrop={handleDrop}
@@ -139,7 +156,7 @@ function HomeScreen({ onPhotosParsed, onSampleTrip, onGoHome }) {
             {isParsing ? (
               <div className="parsing-status">
                 <div className="icon-badge icon-badge--pulse" aria-hidden="true">
-                  <span className="icon-badge-glyph">📷</span>
+                  <img src={cameraIcon} alt="" />
                 </div>
                 <div className="progress-bar-track">
                   <div
@@ -154,30 +171,30 @@ function HomeScreen({ onPhotosParsed, onSampleTrip, onGoHome }) {
                   />
                 </div>
                 <p className="parsing-text">
-                  사진 {progress.total}장의 위치와 시간을 분석하고 있어요...
+                  토리가 사진 {progress.total}장의 위치와 시간을 살펴보고 있어요...
                   ({progress.done}/{progress.total})
                 </p>
               </div>
             ) : (
               <>
                 <div className="icon-badge" aria-hidden="true">
-                  <span className="icon-badge-glyph">📷</span>
+                  <img src={cameraIcon} alt="" />
                 </div>
                 <p className="drop-zone-guide">
                   지난 여행 사진 {MIN_PHOTOS}~{MAX_PHOTOS}장을
                   <br className="drop-zone-guide-break" />
                   <span className="drop-zone-guide-break-space">{' '}</span>
-                  업로드해주세요
+                  올려주세요
                 </p>
                 <span className="drop-zone-sub" aria-hidden="true">
-                  🐾&nbsp; 아래 버튼으로 사진을 선택해주세요 &nbsp;🐾
+                  <Paw size={14} /> 아래 버튼으로 사진을 골라주세요 <Paw size={14} />
                 </span>
                 <button
                   type="button"
-                  className="select-photos-button"
+                  className="tori-btn tori-btn--primary select-photos-button"
                   onClick={openFilePicker}
                 >
-                  사진 선택하기
+                  사진 고르기
                 </button>
                 <input
                   ref={fileInputRef}
@@ -187,7 +204,12 @@ function HomeScreen({ onPhotosParsed, onSampleTrip, onGoHome }) {
                   hidden
                   onChange={handleFileInputChange}
                 />
-                {error && <p className="drop-zone-error">{error}</p>}
+                {error && (
+                  <p className="drop-zone-error">
+                    <img src={toriHuh} alt="" aria-hidden="true" />
+                    {error}
+                  </p>
+                )}
                 <div className="ticket-divider" aria-hidden="true" />
                 <p className="ticket-footnote">JPG · PNG · HEIC 지원</p>
               </>
@@ -197,10 +219,10 @@ function HomeScreen({ onPhotosParsed, onSampleTrip, onGoHome }) {
 
         {!isParsing && (
           <div className="outcome-preview">
-            <p className="outcome-heading">✨ 나만의 여행 추억을 만들 수 있어요! ✨</p>
+            <p className="tori-eyebrow outcome-heading">이런 게 만들어져요</p>
             <div className="outcome-preview-row">
               <div className="journey-preview">
-                <div className="journey-preview-card">
+                <div className="journey-preview-card tori-frame">
                   <svg
                     className="journey-preview-svg"
                     viewBox="0 0 380 84"
@@ -300,37 +322,28 @@ function HomeScreen({ onPhotosParsed, onSampleTrip, onGoHome }) {
             </div>
 
             <div className="feature-strip">
-              <span className="feature-chip">📍 GPS 자동 인식</span>
-              <span className="feature-chip">👣 발자취 재생</span>
-              <span className="feature-chip">🎫 포토 티켓 생성</span>
+              <span className="tori-chip">📍 GPS 자동 인식</span>
+              <span className="tori-chip">🐾 발자취 재생</span>
+              <span className="tori-chip">🎫 포토 티켓 생성</span>
             </div>
           </div>
         )}
-
-        {/*{!isParsing && (*/}
-        {/*  <button*/}
-        {/*    type="button"*/}
-        {/*    className="sample-trip-link"*/}
-        {/*    onClick={onSampleTrip}*/}
-        {/*  >*/}
-        {/*    ✨ 사진이 없나요? 샘플 여행(제주도 3박 4일) 지도로 둘러보기 ✨*/}
-        {/*  </button>*/}
-        {/*)}*/}
       </main>
 
       <footer className="home-footer">
         <div className="home-footer-brand">
-          <span className="home-footer-logo" aria-hidden="true">
-            ✈️
+          <img className="home-footer-logo" src={logo} alt="" aria-hidden="true" />
+          <span>트립루트</span>
+          <span className="home-footer-trail" aria-hidden="true">
+            <DottedPath size={40} />
           </span>
-          <span>트립루티</span>
         </div>
         <p className="home-footer-tagline">
           <span aria-hidden="true">🔒</span> 사진은 서버에 저장되지 않고,
           기기 안에서만 안전하게 처리돼요
         </p>
         <p className="home-footer-copyright">
-          © {new Date().getFullYear()} 트립루티. All rights reserved.
+          © {new Date().getFullYear()} 트립루트. All rights reserved.
         </p>
       </footer>
     </div>
