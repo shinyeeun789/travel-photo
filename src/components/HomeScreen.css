@@ -340,21 +340,6 @@
   font-size: 1.05rem;
 }
 
-.drop-zone-error {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  color: #b4522f;
-  font-size: 0.85rem;
-  margin: 0.4rem 0 0;
-  font-weight: 600;
-}
-
-.drop-zone-error img {
-  width: 26px;
-  height: auto;
-}
-
 .ticket-divider {
   width: 100%;
   max-width: 300px;

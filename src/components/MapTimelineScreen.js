@@ -232,9 +232,6 @@ function MapTimelineScreen({
         <div className="timeline-header">
           <div className="trip-ticket">
             <div className="trip-ticket-stub">
-              <span className="trip-ticket-stub-icon" aria-hidden="true">
-                🎫
-              </span>
               <span className="trip-ticket-stub-label">
                 TRIP
                 <br />

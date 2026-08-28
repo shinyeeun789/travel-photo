@@ -23,6 +23,14 @@ const MAP_ATTRIBUTION = '© OpenMapTiles © OpenStreetMap contributors';
 // shows place names instead of just a bare overview.
 const MIN_LABEL_ZOOM = 13;
 
+// Every land-detail fill (forest/park green, farmland, built-up areas) is a
+// discrete OSM polygon, so zoomed way out they speckle the country with
+// hard-edged blobs rather than reading as terrain. Gate all of them — plus
+// the feather outlines and the mountain-peak markers/labels — to this zoom
+// so the national/regional overview is one clean flat land colour; the
+// detail fades in only once you're zoomed into an actual trip area.
+const LAND_DETAIL_MIN_ZOOM = 10;
+
 const SHORT_TRIP_ZOOM_BOOST = 1.2;
 const ZOOM_BOOST_STEP = 0.1;
 
@@ -37,32 +45,23 @@ const ZOOM_BOOST_STEP = 0.1;
 const PAW_SPACING_PX = 52;
 const MAX_PAWS = 70;
 
-// Inlined (not an <img>) so its fill follows `currentColor` — the pink set
-// on .trip-map-paw-shape in TripMap.css. Toes point "up" (−y); dropPaw
-// rotates the whole mark to the route's local heading. Chunky beans that
-// overlap the heel pad so it stays unmistakably a paw even ~20px wide.
-const PAW_SVG = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" fill="currentColor" aria-hidden="true">
-<ellipse cx="23" cy="42" rx="12" ry="15.5" transform="rotate(-20 23 42)"/>
-<ellipse cx="42" cy="24" rx="12.5" ry="16.5" transform="rotate(-7 42 24)"/>
-<ellipse cx="60" cy="24" rx="12.5" ry="16.5" transform="rotate(7 60 24)"/>
-<ellipse cx="79" cy="42" rx="12" ry="15.5" transform="rotate(20 79 42)"/>
-<path d="M50 40c16 0 27 10 27 25 0 16-12 27-27 27s-27-11-27-27c0-15 11-25 27-25z"/>
+// Same 3-bean paw as the <Paw> doodle on the home screen (Doodles.js) —
+// kept in sync by hand so the route trail and the home-screen decorations
+// read as one mark. Toes point "up" (−y); dropPaw rotates the whole thing
+// to the route's local heading. Fill follows `currentColor` (the deep
+// caramel set on .trip-map-paw-shape in TripMap.css).
+const PAW_SVG = `<svg viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg" fill="currentColor" aria-hidden="true">
+<ellipse cx="15" cy="20" rx="7.5" ry="6"/>
+<ellipse cx="6.5" cy="12.5" rx="3.2" ry="4"/>
+<ellipse cx="15" cy="9" rx="3.4" ry="4.2"/>
+<ellipse cx="23.5" cy="12.5" rx="3.2" ry="4"/>
 </svg>`;
 
-// Symbol layers with text collision detection — MapLibre recomputes label
-// placement on every camera change, which is the main cost of panning the
-// map. Fine at rest, but during the 3D route's continuous pan across real
-// distances it was the source of visible stutter (one frame measured at
-// 316ms). During playback these get text-allow-overlap/ignore-placement
-// toggled on (see the routePlaying effect) to skip that collision pass —
-// labels stay on screen the whole time instead of blinking out.
-// The blurred "feather" outline layers (line-blur) that soften the edges
-// between landcover/park colors — line-blur is a genuinely expensive paint
-// property (a GPU blur pass per layer, per frame) and repainting 8 of them
-// (4 kinds × korea/japan) on every camera-eased frame during route playback
-// is what caused visible lag. They're purely decorative at rest, so they're
-// hidden for the duration of playback (see the routePlaying effect) and
-// restored afterward, the same way LABEL_LAYER_IDS skips collision work.
+// The blurred "feather" outline layers (line-blur) soften the edges of the
+// forest/park greens so mountain ranges read as soft masses rather than
+// hard-edged blobs. line-blur is an expensive paint property (a GPU blur
+// pass per layer, per frame), so all 8 (4 kinds × korea/japan) are hidden
+// for the duration of route playback and restored afterward.
 const FEATHER_LAYER_IDS = ['korea', 'japan'].flatMap((source) =>
   [
     'landcover-wood-feather',
@@ -72,30 +71,29 @@ const FEATHER_LAYER_IDS = ['korea', 'japan'].flatMap((source) =>
   ].map((layer) => `${layer}-${source}`)
 );
 
-const LABEL_LAYER_IDS = ['korea', 'japan'].flatMap((source) =>
-  ['road-label', 'poi-label', 'place-label', 'mountain-peak-label'].map(
-    (layer) => `${layer}-${source}`
-  )
-);
-
 // Route-play "stamp" photos render at just 46px on screen (see
-// .trip-map-stamp in TripMap.css), but were being decoded straight from the
-// original uploaded file — a real phone photo can be several MB and 3000px+
-// on a side, and decoding that just to show a 46px circle is real,
-// measurable main-thread work. On weaker mobile hardware this was enough to
-// visibly freeze playback right as whichever stop's decode was still in
-// flight when the marker reached it. createImageBitmap's resize option lets
-// supporting browsers decode directly at a much smaller internal
-// resolution — cheaper than a full decode followed by a canvas downscale —
-// and the small canvas output means any later re-paint is trivially cheap
-// too. Falls back to the original file's own object URL if
-// createImageBitmap (or resizing) isn't supported.
-const STAMP_THUMB_MAX_SIZE = 160;
-async function createStampThumbnailUrl(file) {
+// .trip-map-stamp in TripMap.css), but a real phone photo is several MB and
+// 3000px+ on a side, so decoding one just to show a 46px circle is real
+// main-thread work. createImageBitmap's resize option decodes at a much
+// smaller internal resolution and the tiny JPEG it re-encodes to is then
+// trivially cheap to paint.
+//
+// The catch measured in Chrome: one such decode is ~250ms, but firing all
+// of a trip's stops at once (Promise.all-style) put them in contention and
+// each ballooned to 1.5–2.5s, freezing playback. So (a) every call is
+// serialized through this module-level chain — one decode at a time — and
+// (b) they're kicked off when the route is built (see the pin-build
+// effect), well before the user can press play, so playback itself does
+// zero image work.
+const STAMP_THUMB_MAX_SIZE = 128;
+
+let thumbnailChain = Promise.resolve();
+
+async function decodeStampThumbnail(file) {
   try {
     const bitmap = await createImageBitmap(file, {
       resizeWidth: STAMP_THUMB_MAX_SIZE,
-      resizeQuality: 'medium',
+      resizeQuality: 'low',
     });
     const canvas = document.createElement('canvas');
     canvas.width = bitmap.width;
@@ -104,13 +102,25 @@ async function createStampThumbnailUrl(file) {
     ctx.drawImage(bitmap, 0, 0);
     bitmap.close?.();
     const blob = await new Promise((resolve) =>
-      canvas.toBlob(resolve, 'image/jpeg', 0.8)
+      canvas.toBlob(resolve, 'image/jpeg', 0.75)
     );
     if (blob) return URL.createObjectURL(blob);
   } catch {
     // createImageBitmap/canvas unsupported or failed — fall through.
   }
   return URL.createObjectURL(file);
+}
+
+function createStampThumbnailUrl(file) {
+  const run = () => decodeStampThumbnail(file);
+  const result = thumbnailChain.then(run, run);
+  // Keep the chain alive even if this one rejects, and don't let it retain
+  // the resolved URL.
+  thumbnailChain = result.then(
+    () => undefined,
+    () => undefined
+  );
+  return result;
 }
 
 // Bounding box roughly covering the Korean peninsula, used to cap how far
@@ -124,22 +134,22 @@ const KOREA_PENINSULA_BOUNDS = [
 // output). @protomaps/basemaps was tried first but targets Protomaps' own
 // schema (different source-layer names), so it rendered nothing against
 // these tiles.
-// Fades colors out at low zoom (far away) and brings them in at high zoom
-// (close up), similar to how Naver/Kakao Maps go paler when zoomed out.
+// Clean, neutral "big map app" look — pale grey-green land, soft blue
+// water, muted forest green, thin light roads. Only a very slight fade at
+// far zoom so the tone stays consistent (unlike the old warm Naver/Kakao
+// treatment that went noticeably paler when zoomed out).
 const ZOOM_FADE_OPACITY = [
   'interpolate',
   ['linear'],
   ['zoom'],
   3,
-  0.4,
-  6,
-  0.55,
-  9,
-  0.7,
-  12,
-  0.85,
-  15,
-  0.95,
+  0.82,
+  7,
+  0.9,
+  11,
+  0.97,
+  14,
+  1,
 ];
 
 function buildLayersForSource(sourceId) {
@@ -150,6 +160,7 @@ function buildLayersForSource(sourceId) {
       type: 'fill',
       source: sourceId,
       'source-layer': 'landcover',
+      minzoom: LAND_DETAIL_MIN_ZOOM,
       filter: ['match', ['get', 'class'], ['wood', 'forest'], true, false],
       paint: {
         'fill-color': '#cfe4c4',
@@ -161,11 +172,12 @@ function buildLayersForSource(sourceId) {
       // via queryRenderedFeatures() against real tile data and confirmed
       // these are tagged in the 'landcover' source-layer (not 'landuse') as
       // class 'grass', so they fell through to the generic landcover fill
-      // below and read as plain beige instead of green.
+      // below and read as plain grey instead of green.
       id: src('landcover-grass'),
       type: 'fill',
       source: sourceId,
       'source-layer': 'landcover',
+      minzoom: LAND_DETAIL_MIN_ZOOM,
       filter: ['match', ['get', 'class'], ['grass'], true, false],
       paint: {
         'fill-color': '#bce0ae',
@@ -177,30 +189,33 @@ function buildLayersForSource(sourceId) {
       type: 'fill',
       source: sourceId,
       'source-layer': 'landcover',
+      minzoom: LAND_DETAIL_MIN_ZOOM,
       filter: [
         '!',
         ['match', ['get', 'class'], ['wood', 'forest', 'grass'], true, false],
       ],
-      paint: { 'fill-color': '#f2ede3', 'fill-opacity': ZOOM_FADE_OPACITY },
+      paint: { 'fill-color': '#e9ece3', 'fill-opacity': ZOOM_FADE_OPACITY },
     },
     {
       id: src('landuse'),
       type: 'fill',
       source: sourceId,
       'source-layer': 'landuse',
+      minzoom: LAND_DETAIL_MIN_ZOOM,
       filter: ['in', 'class', 'residential', 'suburb', 'neighbourhood'],
-      paint: { 'fill-color': '#efe9df', 'fill-opacity': ZOOM_FADE_OPACITY },
+      paint: { 'fill-color': '#e4e6df', 'fill-opacity': ZOOM_FADE_OPACITY },
     },
     {
       // Grassy grounds (e.g. 경주 동궁과 월지's palace/pond grounds) — the
       // 'landuse' source-layer tags these as class 'grass'/'garden'/etc,
       // separate from the 'park' source-layer below (which only covers
       // leisure=park), so without this they fell through to the generic
-      // landcover fill and read as plain gray/beige instead of green.
+      // landcover fill and read as plain grey instead of green.
       id: src('landuse-green'),
       type: 'fill',
       source: sourceId,
       'source-layer': 'landuse',
+      minzoom: LAND_DETAIL_MIN_ZOOM,
       filter: [
         'in',
         'class',
@@ -216,6 +231,7 @@ function buildLayersForSource(sourceId) {
       type: 'fill',
       source: sourceId,
       'source-layer': 'park',
+      minzoom: LAND_DETAIL_MIN_ZOOM,
       paint: { 'fill-color': '#bce0ae', 'fill-opacity': ZOOM_FADE_OPACITY },
     },
     // Soft-edge "feather" for the green areas above (wood/grass/landuse-green/
@@ -229,6 +245,7 @@ function buildLayersForSource(sourceId) {
       type: 'line',
       source: sourceId,
       'source-layer': 'landcover',
+      minzoom: LAND_DETAIL_MIN_ZOOM,
       filter: ['match', ['get', 'class'], ['wood', 'forest'], true, false],
       paint: {
         'line-color': '#cfe4c4',
@@ -242,6 +259,7 @@ function buildLayersForSource(sourceId) {
       type: 'line',
       source: sourceId,
       'source-layer': 'landcover',
+      minzoom: LAND_DETAIL_MIN_ZOOM,
       filter: ['match', ['get', 'class'], ['grass'], true, false],
       paint: {
         'line-color': '#bce0ae',
@@ -255,6 +273,7 @@ function buildLayersForSource(sourceId) {
       type: 'line',
       source: sourceId,
       'source-layer': 'landuse',
+      minzoom: LAND_DETAIL_MIN_ZOOM,
       filter: [
         'in',
         'class',
@@ -275,6 +294,7 @@ function buildLayersForSource(sourceId) {
       type: 'line',
       source: sourceId,
       'source-layer': 'park',
+      minzoom: LAND_DETAIL_MIN_ZOOM,
       paint: {
         'line-color': '#bce0ae',
         'line-width': 14,
@@ -287,14 +307,14 @@ function buildLayersForSource(sourceId) {
       type: 'fill',
       source: sourceId,
       'source-layer': 'water',
-      paint: { 'fill-color': '#d6e7f3', 'fill-opacity': ZOOM_FADE_OPACITY },
+      paint: { 'fill-color': '#a9cfe3', 'fill-opacity': ZOOM_FADE_OPACITY },
     },
     {
       id: src('waterway'),
       type: 'line',
       source: sourceId,
       'source-layer': 'waterway',
-      paint: { 'line-color': '#c4dcee', 'line-width': 1 },
+      paint: { 'line-color': '#a3c6da', 'line-width': 1 },
     },
     {
       id: src('boundary'),
@@ -303,7 +323,7 @@ function buildLayersForSource(sourceId) {
       'source-layer': 'boundary',
       filter: ['<=', 'admin_level', 4],
       paint: {
-        'line-color': '#c9c2d6',
+        'line-color': '#c1c4ca',
         'line-width': 1,
         'line-dasharray': [2, 1.5],
       },
@@ -315,7 +335,7 @@ function buildLayersForSource(sourceId) {
       'source-layer': 'transportation',
       filter: ['in', 'class', 'motorway', 'trunk', 'primary', 'secondary'],
       layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': '#e2c483', 'line-width': 2.5 },
+      paint: { 'line-color': '#dcdcd8', 'line-width': 2.4 },
     },
     {
       id: src('transportation'),
@@ -333,7 +353,7 @@ function buildLayersForSource(sourceId) {
         'minor',
       ],
       layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': '#f6dfae', 'line-width': 1.3 },
+      paint: { 'line-color': '#ffffff', 'line-width': 1.5 },
     },
     {
       // Park/trail footpaths — same 'transportation' source-layer as the
@@ -351,10 +371,10 @@ function buildLayersForSource(sourceId) {
       filter: ['==', ['get', 'class'], 'path'],
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: {
-        'line-color': '#c9a876',
-        'line-width': 1.4,
+        'line-color': '#d0d0cb',
+        'line-width': 1.3,
         'line-dasharray': [2, 1.5],
-        'line-opacity': 0.85,
+        'line-opacity': 0.9,
       },
     },
     {
@@ -363,8 +383,20 @@ function buildLayersForSource(sourceId) {
       source: sourceId,
       'source-layer': 'building',
       minzoom: 13,
-      paint: { 'fill-color': '#e9e3d8', 'fill-opacity': 0.8 },
+      paint: { 'fill-color': '#e6e6e0', 'fill-opacity': 0.6 },
     },
+  ];
+}
+
+// Label + marker layers, kept separate from the fill/line base above so
+// buildStyle can stack ALL labels (both sources) on top of ALL fills.
+// When korea's and japan's full layer sets were simply concatenated,
+// japan's translucent water/landcover fills were painted *over* korea's
+// place labels near the coast — "부산광역시" and friends came out
+// washed-grey while japan's own labels (drawn last) stayed crisp.
+function buildLabelLayersForSource(sourceId) {
+  const src = (id) => `${id}-${sourceId}`;
+  return [
     {
       id: src('road-label'),
       type: 'symbol',
@@ -387,11 +419,12 @@ function buildLayersForSource(sourceId) {
         'text-field': ['coalesce', ['get', 'name:ko'], ['get', 'name']],
         'text-font': ['Noto Sans Regular'],
         'text-size': 11,
+        'text-padding': 8,
       },
       paint: {
-        'text-color': '#7a5c42',
-        'text-halo-color': '#fffdf6',
-        'text-halo-width': 1.8,
+        'text-color': '#83878d',
+        'text-halo-color': '#ffffff',
+        'text-halo-width': 1.6,
       },
     },
     {
@@ -408,11 +441,16 @@ function buildLayersForSource(sourceId) {
         'text-size': 11,
         'text-offset': [0, 0.6],
         'text-anchor': 'top',
+        // OSM stores many places as both a point and an area, so the tiles
+        // carry the same name twice at slightly different spots. A generous
+        // collision box around each POI label makes those near-duplicates
+        // knock each other out — only one survives.
+        'text-padding': 16,
       },
       paint: {
-        'text-color': '#3f7bab',
-        'text-halo-color': '#fffdf6',
-        'text-halo-width': 1.8,
+        'text-color': '#8b8f95',
+        'text-halo-color': '#ffffff',
+        'text-halo-width': 1.5,
       },
     },
     {
@@ -420,17 +458,32 @@ function buildLayersForSource(sourceId) {
       type: 'symbol',
       source: sourceId,
       'source-layer': 'place',
-      filter: ['in', 'class', 'city', 'town', 'village'],
+      filter: ['in', 'class', 'country', 'state', 'city', 'town', 'village'],
       layout: {
         'symbol-avoid-edges': true,
         'text-field': ['coalesce', ['get', 'name:ko'], ['get', 'name']],
         'text-font': ['Noto Sans Regular'],
-        'text-size': 13,
+        'text-size': [
+          'match',
+          ['get', 'class'],
+          'country',
+          15,
+          'state',
+          12,
+          13,
+        ],
+        'text-padding': 18,
       },
       paint: {
-        'text-color': '#4a3423',
-        'text-halo-color': '#fffdf6',
-        'text-halo-width': 2,
+        'text-color': [
+          'match',
+          ['get', 'class'],
+          'country',
+          '#9a9a9a',
+          '#4b4b4b',
+        ],
+        'text-halo-color': '#ffffff',
+        'text-halo-width': 1.6,
       },
     },
     {
@@ -438,10 +491,10 @@ function buildLayersForSource(sourceId) {
       type: 'circle',
       source: sourceId,
       'source-layer': 'mountain_peak',
-      minzoom: 8,
+      minzoom: LAND_DETAIL_MIN_ZOOM,
       paint: {
-        'circle-radius': 4,
-        'circle-color': '#5da652',
+        'circle-radius': 3.5,
+        'circle-color': '#8aa47b',
         'circle-stroke-color': '#ffffff',
         'circle-stroke-width': 1.5,
       },
@@ -451,7 +504,7 @@ function buildLayersForSource(sourceId) {
       type: 'symbol',
       source: sourceId,
       'source-layer': 'mountain_peak',
-      minzoom: 8,
+      minzoom: LAND_DETAIL_MIN_ZOOM,
       layout: {
         'symbol-avoid-edges': true,
         'text-field': [
@@ -470,11 +523,12 @@ function buildLayersForSource(sourceId) {
         'text-size': 10,
         'text-offset': [0, 0.7],
         'text-anchor': 'top',
+        'text-padding': 12,
       },
       paint: {
-        'text-color': '#4d8c46',
+        'text-color': '#728a63',
         'text-halo-color': '#ffffff',
-        'text-halo-width': 1.8,
+        'text-halo-width': 1.6,
       },
     },
   ];
@@ -501,10 +555,15 @@ function buildStyle() {
       {
         id: 'background',
         type: 'background',
-        paint: { 'background-color': '#fbf3e2' },
+        paint: { 'background-color': '#eef0ea' },
       },
+      // All fills/lines from both sources first, then all labels from both
+      // sources — so no source's translucent water/land fill can paint
+      // over another source's labels (see buildLabelLayersForSource).
       ...buildLayersForSource('korea'),
       ...buildLayersForSource('japan'),
+      ...buildLabelLayersForSource('korea'),
+      ...buildLabelLayersForSource('japan'),
     ],
   };
 }
@@ -743,20 +802,26 @@ function TripMap({
   const stampUrlsRef = useRef({});
   const pawMarkersRef = useRef([]);
 
-  // Removes every photo "stamp" and paw print placed by the route-play
-  // animation and revokes the object URLs it created for the stamps —
-  // shared by the unmount cleanup and by the pin-rebuild effect (a fresh
-  // set of photos/positions makes any previous marks stale).
-  const clearStamps = useCallback(() => {
+  // Removes the placed stamp + paw-print markers (a replay starts from a
+  // clean passport) but keeps the decoded stamp thumbnails around — they're
+  // keyed by photo id and stay valid until the photo set changes.
+  const clearStampMarks = useCallback(() => {
     Object.values(stampMarkersRef.current).forEach((m) => m.remove());
     stampMarkersRef.current = {};
+    pawMarkersRef.current.forEach((m) => m.remove());
+    pawMarkersRef.current = [];
+  }, []);
+
+  // The above, plus revoking the thumbnail object URLs — for the unmount
+  // cleanup and the pin-rebuild effect, where a fresh photo set makes the
+  // old thumbnails stale.
+  const clearStamps = useCallback(() => {
+    clearStampMarks();
     Object.values(stampUrlsRef.current).forEach((url) =>
       URL.revokeObjectURL(url)
     );
     stampUrlsRef.current = {};
-    pawMarkersRef.current.forEach((m) => m.remove());
-    pawMarkersRef.current = [];
-  }, []);
+  }, [clearStampMarks]);
 
   useEffect(() => {
     const protocol = new Protocol();
@@ -852,6 +917,27 @@ function TripMap({
           : [];
       routeSplineRef.current = spline;
       routeStopsRef.current = { photoIds, coords };
+
+      // Pre-decode every stop's stamp thumbnail now, serialized (see
+      // createStampThumbnailUrl) — the user always spends a few seconds on
+      // this screen before hitting play, which is plenty of time for
+      // ~250ms-each decodes to finish, so playback does no image work.
+      photoIds.forEach((photoId) => {
+        const photo = photos.find((p) => p.id === photoId);
+        if (!photo?.file || stampUrlsRef.current[photoId]) return;
+        createStampThumbnailUrl(photo.file).then((url) => {
+          if (stampUrlsRef.current[photoId]) {
+            URL.revokeObjectURL(url);
+            return;
+          }
+          stampUrlsRef.current[photoId] = url;
+          // If the stamp was already built (fast replay), fill its photo in.
+          const img = stampMarkersRef.current[photoId]
+            ?.getElement()
+            .querySelector('img.trip-map-stamp-img');
+          if (img && !img.getAttribute('src')) img.src = url;
+        });
+      });
       const routeGeoJson = {
         type: 'Feature',
         geometry: { type: 'LineString', coordinates: spline },
@@ -1013,28 +1099,36 @@ function TripMap({
       return undefined;
     }
 
-    // The expensive part on every camera change isn't drawing these labels,
-    // it's resolving collisions between them (deciding which overlapping
-    // ones to hide). Letting them overlap freely during the flythrough
-    // skips that step — labels may crowd each other briefly while the
-    // camera's mid-pan, which barely reads at speed — without the labels
-    // vanishing outright the way hiding the layers did.
-    LABEL_LAYER_IDS.forEach((id) => {
-      if (map.getLayer(id)) {
-        map.setLayoutProperty(id, 'text-allow-overlap', true);
-        map.setLayoutProperty(id, 'text-ignore-placement', true);
-        map.setLayoutProperty(id, 'icon-allow-overlap', true);
-      }
-    });
+    let torndown = false;
 
-    FEATHER_LAYER_IDS.forEach((id) => {
-      if (map.getLayer(id)) {
-        map.setLayoutProperty(id, 'visibility', 'none');
-      }
-    });
+    // line-blur is a per-frame GPU pass, so hide the feather layers while
+    // the camera is easing. Deferred a task — the 8 setLayoutProperty calls
+    // each make MapLibre re-validate a layer, which doesn't need to share
+    // the frame that also kicks off the first easeTo. Restored in cleanup.
+    //
+    // (An earlier version also toggled `text-allow-overlap` on every label
+    // layer here to skip the per-camera collision pass. Profiling in Chrome
+    // showed that burst — ~24 more setLayoutProperty calls — cost more than
+    // the collision work it saved now that legs are short and spaced by the
+    // stop dwell, so it's gone.)
+    // Spread across separate frames so no one task is heavy: hide the
+    // feathers, then (next frame) build the stamp markers.
+    setTimeout(() => {
+      if (torndown) return;
+      FEATHER_LAYER_IDS.forEach((id) => {
+        if (map.getLayer(id)) {
+          map.setLayoutProperty(id, 'visibility', 'none');
+        }
+      });
+      requestAnimationFrame(() => {
+        if (torndown) return;
+        for (let i = 0; i < stops.photoIds.length; i++) buildStamp(i);
+        stampStop(0); // land the stamp at the starting stop
+      });
+    }, 0);
 
     // The dotted route line stays visible through playback — it reads as
-    // the faint "trail on the ground" that the pink paw prints are stamped
+    // the faint "trail on the ground" that the paw prints are stamped
     // along, then it's all that's left once the prints clear at the end.
 
     // Keep the user from panning/zooming away mid-flythrough — the camera
@@ -1054,42 +1148,22 @@ function TripMap({
     interactionHandlers.forEach((handler) => handler.disable());
 
     // Reset from any earlier play-through so a replay starts with a clean
-    // passport rather than piling stamps on top of the previous run's.
-    clearStamps();
+    // passport — but keep the decoded thumbnails (clearStampMarks, not
+    // clearStamps) so a replay does no image work either.
+    clearStampMarks();
 
-    // Warm up every stop photo's object URL + image decode ahead of when
-    // each stamp actually needs it, instead of paying for both the first
-    // time it's dropped mid-animation. JPEG decode is real main-thread
-    // work — but doing this *synchronously* right here, in the same tick
-    // that also toggles ~30+ layer properties above and is about to kick
-    // off the camera's first easeTo, was itself piling extra work onto the
-    // very first frame (measured: a 666ms spike in the opening seconds,
-    // well before any stop was even reached). Deferred via setTimeout so it
-    // runs as its own task after that critical startup frame has had a
-    // chance to render, not competing with it.
-    setTimeout(() => {
-      stops.photoIds.forEach((photoId) => {
-        if (!photoId || stampUrlsRef.current[photoId]) return;
-        const photo = photos.find((p) => p.id === photoId);
-        if (!photo?.file) return;
-        createStampThumbnailUrl(photo.file).then((url) => {
-          // Another path (a missed-preload fallback in stampStop, or a
-          // replay) may have already filled this in while the decode
-          // above was in flight — don't clobber it or leak this blob.
-          if (stampUrlsRef.current[photoId]) {
-            URL.revokeObjectURL(url);
-            return;
-          }
-          stampUrlsRef.current[photoId] = url;
-        });
-      });
-    }, 0);
+    // Stamp markers are built up front (see the deferred block above) so a
+    // stop being reached is just a class flip, not a Marker insertion —
+    // that was a hitch when stops sat close together. Thumbnails were
+    // pre-decoded when the route was built (see the pin-build effect), so
+    // no image work happens here or during playback.
 
-    // Drops a passport-style photo stamp at a stop the traveler marker has
-    // just reached — a visual "checked in here" mark that stays on the map
-    // for the rest of this playback (cleared on the next run or whenever
-    // the photo set changes, via clearStamps above).
-    const stampStop = (legIndex) => {
+    // Builds a passport-style photo stamp's DOM + Marker and adds it to the
+    // map, invisible (the .trip-map-stamp-shape base style is opacity 0 /
+    // scale 0.3 until the --landed class lands it). Split out from stampStop
+    // so every stamp for a run can be created up front (see the warm-up
+    // above), keeping the per-arrival work down to one class toggle.
+    const buildStamp = (legIndex) => {
       const photoId = stops.photoIds[legIndex];
       if (!photoId || stampMarkersRef.current[photoId]) return;
       const photo = photos.find((p) => p.id === photoId);
@@ -1104,15 +1178,14 @@ function TripMap({
       const inner = document.createElement('div');
       inner.className = 'trip-map-stamp-shape';
       if (photo.file) {
-        // Preloaded above, before playback started — falls back to creating
-        // one on the spot only if this stop was somehow missed there.
-        const url =
-          stampUrlsRef.current[photoId] || URL.createObjectURL(photo.file);
-        stampUrlsRef.current[photoId] = url;
         const img = document.createElement('img');
         img.className = 'trip-map-stamp-img';
-        img.src = url;
         img.alt = '';
+        // src is filled in when the downscaled thumbnail resolves (warm-up
+        // above), or lazily in stampStop if that hasn't happened yet.
+        if (stampUrlsRef.current[photoId]) {
+          img.src = stampUrlsRef.current[photoId];
+        }
         inner.appendChild(img);
       } else {
         inner.classList.add('trip-map-stamp-shape--placeholder');
@@ -1124,20 +1197,54 @@ function TripMap({
         .setLngLat(stops.coords[legIndex])
         .addTo(map);
       stampMarkersRef.current[photoId] = marker;
+    };
 
-      // Added post-mount so the "stamp-in" animation (defined on
-      // .trip-map-stamp--landed) actually transitions in, instead of
-      // starting in its end state if the class were present from creation.
+    // "Lands" the stamp at a stop the traveler has just reached — the marker
+    // already exists (buildStamp), so this is just one class flip to run the
+    // CSS pop-in. Cheap enough to fire back-to-back for a cluster of stops.
+    const stampStop = (legIndex) => {
+      const photoId = stops.photoIds[legIndex];
+      if (!photoId) return;
+      if (!stampMarkersRef.current[photoId]) buildStamp(legIndex);
+      const marker = stampMarkersRef.current[photoId];
+      if (!marker) return;
+      const el = marker.getElement();
+      if (el.classList.contains('trip-map-stamp--landed')) return;
+      // If the thumbnail is ready by now, use it — but never fall back to
+      // decoding the full-res file here (that was the freeze). If it isn't
+      // ready the stamp pops in photo-less for a beat; the pin-build
+      // effect's serialized decode fills it in a moment later.
+      const img = el.querySelector('img.trip-map-stamp-img');
+      if (img && !img.getAttribute('src') && stampUrlsRef.current[photoId]) {
+        img.src = stampUrlsRef.current[photoId];
+      }
       requestAnimationFrame(() => el.classList.add('trip-map-stamp--landed'));
     };
 
-    // Snap the camera to stop 1 at the overview zoom before the first leg's
-    // easeTo. The overview left the camera at the framed cluster's centroid
-    // (not stop 1) and possibly at a different zoom (e.g. zoomed into
-    // whichever photo was selected before play) — starting the first easeTo
-    // from that mismatch made the route visibly slide/zoom under the view
-    // for the first ~second while the camera caught up.
-    const playbackZoom = overviewZoomRef.current ?? map.getZoom();
+    // A single, stable playback zoom (changing zoom mid-playback made
+    // MapLibre thrash tiles across zoom levels and left the map blank).
+    // Start from the zoom that fits the WHOLE arched spline — so a leg's
+    // arch or a lone far-flung stop never leaves the trail off-screen while
+    // the camera slides across empty map — then nudge in ~1.5 levels so a
+    // tight cluster's stamps read as separate photos rather than one blob.
+    // Capped by the overview zoom and 16.
+    const routeBounds = new LngLatBounds();
+    spline.forEach((c) => routeBounds.extend(c));
+    const fitCam = map.cameraForBounds(routeBounds, { padding: 56 });
+    const routeFitZoom =
+      fitCam && fitCam.zoom != null
+        ? fitCam.zoom
+        : overviewZoomRef.current ?? map.getZoom();
+    const playbackZoom = Math.min(
+      routeFitZoom + 1.5,
+      overviewZoomRef.current ?? 16,
+      16
+    );
+
+    // Snap to stop 1 first — the overview left the camera at the framed
+    // cluster's centroid (not stop 1) and maybe a different zoom, and
+    // starting the first easeTo from that mismatch made the route visibly
+    // slide under the view for the first ~second.
     map.jumpTo({ center: spline[0], zoom: playbackZoom });
 
     // --- Paw-print trail -------------------------------------------------
@@ -1252,81 +1359,59 @@ function TripMap({
     const legDurationsMs = legDistancesKm.map((d) =>
       Math.max(MIN_LEG_DURATION_MS, d / effectiveSpeedKmPerMs)
     );
-    const legStartMs = [0];
+    // A short pause at each stop between arriving (photo stamp pops in) and
+    // setting off again — playback reads as "travel → check in at the photo
+    // → travel" instead of racing continuously, and a cluster of nearby
+    // stops can no longer fire arrivals back-to-back. Per-stop, but the
+    // total is capped so a photo-heavy trip compresses the pause rather
+    // than running for a minute.
+    const STOP_DWELL_MS = 900;
+    const MAX_TOTAL_DWELL_MS = 6000;
+    const dwellMs = Math.min(STOP_DWELL_MS, MAX_TOTAL_DWELL_MS / numLegs);
+
+    // legMoveStart[k] = elapsed at which leg k starts *moving*. Leg k moves
+    // for legDurationsMs[k], arrives at stop k+1, dwells, then leg k+1
+    // starts. legMoveStart[numLegs] is the end of playback — the last
+    // move's end plus one final dwell held on the last photo.
+    const legMoveStart = [0];
     for (let i = 0; i < numLegs; i++) {
-      legStartMs.push(legStartMs[i] + legDurationsMs[i]);
+      legMoveStart.push(legMoveStart[i] + legDurationsMs[i] + dwellMs);
     }
-    const totalDurationMs = legStartMs[numLegs];
+    const totalDurationMs = legMoveStart[numLegs];
+    // End of leg i's motion == arrival at stop i+1.
+    const legMoveEnd = (i) => legMoveStart[i] + legDurationsMs[i];
 
     let startTime = performance.now();
     let lastFrameNow = startTime;
     let rafId;
     let currentLeg = 0;
-    onSelectPhoto?.(stops.photoIds[0]);
-    stampStop(0);
+    let arrivedStop = 0;
 
-    // Tried driving the camera by hand every frame (map.jumpTo tracking the
-    // same interpolated point as the marker) instead of chaining easeTo per
-    // leg, hoping to remove the restart cost at leg boundaries now that
-    // label collision + feather blur are already off during playback.
-    // Measured worse, not better (25 hitches >30ms vs 19, worst spike 466ms
-    // vs 350ms) — jumpTo forces MapLibre to reproject and repaint every
-    // remaining active layer synchronously on every single call, and at 60
-    // calls/sec that cost is bigger than the per-leg restart cost it was
-    // meant to avoid.
+    // Route-strip / timeline highlight is NOT touched during playback: each
+    // onSelectPhoto re-renders MapTimelineScreen (its big timeline cards
+    // repaint), which profiling put at ~400-500ms — the single biggest
+    // source of playback stutter. The highlight just holds wherever it was,
+    // and snaps to the final photo when playback ends.
+
+    // One easeTo per leg, fired when that leg starts moving. The stop dwell
+    // spaces these out (never back-to-back), so the old short-leg merging —
+    // which existed only to avoid rapid easeTo restarts for stops close
+    // together in real distance — isn't needed any more.
     //
-    // What actually measured as the hitch source was clusters of *short*
-    // legs firing a new easeTo every few hundred ms (stops close together
-    // in real distance) — each call interrupts and restarts MapLibre's
-    // transition state. So instead of one easeTo per leg, consecutive short
-    // legs are merged into a single easeTo that glides straight through all
-    // of them at once — one continuous camera motion instead of several
-    // rapid restarts. A long leg on its own still gets its own easeTo; only
-    // legs *below* the merge threshold get bundled with their neighbors.
-    const CAMERA_MERGE_THRESHOLD_MS = 900;
-    const cameraSegments = [];
-    {
-      let segDurationMs = 0;
-      for (let i = 0; i < numLegs; i++) {
-        const legDur = legDurationsMs[i];
-        // A leg that's already long on its own must never get folded into
-        // whatever short legs came before it (that would merge a huge
-        // real-world jump into one continuous glide, forcing a burst of
-        // fresh tile loads mid-pan) — flush the accumulated short-leg
-        // group as its own segment first, *then* start counting this leg.
-        if (legDur >= CAMERA_MERGE_THRESHOLD_MS && segDurationMs > 0) {
-          cameraSegments.push({ toLeg: i - 1, durationMs: segDurationMs });
-          segDurationMs = 0;
-        }
-        segDurationMs += legDur;
-        const isLastLeg = i === numLegs - 1;
-        if (segDurationMs >= CAMERA_MERGE_THRESHOLD_MS || isLastLeg) {
-          cameraSegments.push({ toLeg: i, durationMs: segDurationMs });
-          segDurationMs = 0;
-        }
-      }
-    }
-    // Which leg starts each segment, so the leg-boundary loop below knows
-    // when to actually kick off a new easeTo vs. let an in-flight one keep
-    // gliding through a merged stop.
-    const segmentByStartLeg = new Map();
-    {
-      let legCursor = 0;
-      cameraSegments.forEach((seg) => {
-        segmentByStartLeg.set(legCursor, seg);
-        legCursor = seg.toLeg + 1;
-      });
-    }
+    // (Tried driving the camera by hand every frame via map.jumpTo instead
+    // of easeTo: measured worse — jumpTo reprojects and repaints every
+    // active layer synchronously on every call, costlier at 60/sec than the
+    // per-leg easeTo restart.)
     const advanceCameraLeg = (legIndex) => {
-      const seg = segmentByStartLeg.get(legIndex);
-      if (!seg) return;
+      if (legIndex >= numLegs) return;
       map.easeTo({
-        center: stops.coords[seg.toLeg + 1],
+        center: stops.coords[legIndex + 1],
         zoom: playbackZoom,
-        duration: seg.durationMs,
+        duration: legDurationsMs[legIndex],
         easing: (x) => x,
       });
     };
+    let cameraLeg = 0;
     advanceCameraLeg(0);
 
     const step = (now) => {
@@ -1352,37 +1437,42 @@ function TripMap({
       const elapsed = Math.max(0, now - startTime);
       const t = Math.min(elapsed / totalDurationMs, 1);
 
-      while (
-        currentLeg < numLegs - 1 &&
-        elapsed >= legStartMs[currentLeg + 1]
-      ) {
-        currentLeg++;
-        const legToStamp = currentLeg;
-        // onSelectPhoto triggers a React re-render up in MapTimelineScreen
-        // (route-strip + timeline active-item highlighting), and stampStop
-        // builds a DOM node (photo <img>, decode included) and inserts a
-        // whole new MapLibre Marker — both real layout/paint cost. Doing
-        // either in the same frame the boundary is crossed piled expensive
-        // work onto that frame, which is what read as a "드드득" hitch right
-        // as each stop's photo popped in. Pushing both to the very next
-        // frame keeps this frame to just the cheap paw-distance check below.
-        requestAnimationFrame(() => {
-          onSelectPhoto?.(stops.photoIds[legToStamp]);
-          stampStop(legToStamp);
-        });
-        advanceCameraLeg(currentLeg);
+      // Arrivals: stamp each stop the instant the leg into it finishes
+      // moving (before its dwell). Cheap now — buildStamp already made the
+      // marker, so this is a class flip, deferred one frame off step().
+      while (arrivedStop < numLegs && elapsed >= legMoveEnd(arrivedStop)) {
+        arrivedStop++;
+        const s = arrivedStop;
+        requestAnimationFrame(() => stampStop(s));
       }
 
-      const legElapsed = elapsed - legStartMs[currentLeg];
+      // Camera: start the next leg's easeTo when its move window opens
+      // (i.e. after the dwell at the stop it departs from).
+      while (
+        cameraLeg < numLegs - 1 &&
+        elapsed >= legMoveStart[cameraLeg + 1]
+      ) {
+        cameraLeg++;
+        advanceCameraLeg(cameraLeg);
+      }
+
+      // Which leg's window (its move, or the dwell right after) contains now.
+      while (
+        currentLeg < numLegs - 1 &&
+        elapsed >= legMoveStart[currentLeg + 1]
+      ) {
+        currentLeg++;
+      }
+      const legMove = elapsed - legMoveStart[currentLeg];
       const legT = Math.max(
         0,
-        Math.min(1, legElapsed / legDurationsMs[currentLeg])
+        Math.min(1, legMove / legDurationsMs[currentLeg])
       );
-      // Fractional spline-vertex index of the current position → the real
-      // distance traveled so far. Drop a paw print for every spacing
-      // interval newly crossed (hard-capped at MAX_PAWS). Sub-sample
-      // interpolation here keeps the drop points smooth even though a leg
-      // only has ROUTE_SAMPLES_PER_SEGMENT samples.
+
+      // Paw trail: distance traveled so far → one print per spacing interval
+      // crossed. legT sits at 1 through the dwell, so nothing drops while
+      // paused. Sub-sample interpolation keeps the drop points smooth even
+      // though a leg only has ROUTE_SAMPLES_PER_SEGMENT samples.
       const scaledLocal = legT * ROUTE_SAMPLES_PER_SEGMENT;
       const base = currentLeg * ROUTE_SAMPLES_PER_SEGMENT;
       const globalFloat = Math.min(spline.length - 1, base + scaledLocal);
@@ -1399,9 +1489,8 @@ function TripMap({
         nextPawKm += pawSpacingKm;
       }
 
-      if (t >= 1 && currentLeg === numLegs - 1) {
+      if (t >= 1) {
         onSelectPhoto?.(stops.photoIds[numLegs]);
-        stampStop(numLegs);
       }
 
       if (t < 1) {
@@ -1416,15 +1505,9 @@ function TripMap({
       cancelAnimationFrame(rafId);
       // The paw trail exists only while playback is running — clear it when
       // playback ends (or unmounts). The dotted route line was never hidden.
+      torndown = true;
       pawMarkersRef.current.forEach((m) => m.remove());
       pawMarkersRef.current = [];
-      LABEL_LAYER_IDS.forEach((id) => {
-        if (map.getLayer(id)) {
-          map.setLayoutProperty(id, 'text-allow-overlap', false);
-          map.setLayoutProperty(id, 'text-ignore-placement', false);
-          map.setLayoutProperty(id, 'icon-allow-overlap', false);
-        }
-      });
       FEATHER_LAYER_IDS.forEach((id) => {
         if (map.getLayer(id)) {
           map.setLayoutProperty(id, 'visibility', 'visible');
@@ -1432,7 +1515,7 @@ function TripMap({
       });
       interactionHandlers.forEach((handler) => handler.enable());
     };
-  }, [routePlaying, onSelectPhoto, onRoutePlayEnd, clearStamps, photos]);
+  }, [routePlaying, onSelectPhoto, onRoutePlayEnd, clearStampMarks, photos]);
 
   useEffect(() => {
     const map = mapRef.current;

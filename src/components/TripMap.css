@@ -16,6 +16,10 @@
   border: none;
   background: none;
   cursor: pointer;
+  /* Marker stacking order (MapLibre 4 doesn't set z-index itself, so DOM
+     insertion order would otherwise decide it): paw trail (1) < pins (2) <
+     photo stamps (6). Keeps the paw prints from covering the photos. */
+  z-index: 2;
 }
 
 /* Ring + center dot, matching the home screen's journey-preview pins. */
@@ -58,12 +62,14 @@
 }
 
 /* Paw prints stamped along the route during playback — they take 토리's
-   place, riding on top of the (still-visible) dotted route line, then
-   clear when playback ends. */
+   place on top of the (still-visible) dotted route line, but sit *under*
+   the pins and photo stamps (z-index) so they never cover a photo. Cleared
+   when playback ends. */
 .trip-map-paw {
-  width: 20px;
-  height: 20px;
+  width: 23px;
+  height: 23px;
   pointer-events: none;
+  z-index: 1;
 }
 
 /* Rotated to the route's local heading — set once, when the print drops. */
@@ -79,12 +85,14 @@
 .trip-map-paw-shape {
   width: 100%;
   height: 100%;
-  color: #f4aecb; /* pastel pink 발바닥 — no map token for pink */
+  color: #9a5a12; /* deep caramel — same 3-bean shape as the home-screen
+                     paw doodles, darker for contrast against the warm map
+                     (cream / tan roads / taupe route line) */
   opacity: 0;
   transform: translateX(var(--paw-off, 0)) scale(0.3);
   transition: transform 0.34s cubic-bezier(0.34, 1.56, 0.64, 1),
     opacity 0.22s ease;
-  filter: drop-shadow(0 1px 1.5px rgba(74, 52, 35, 0.2));
+  filter: drop-shadow(0 1px 2px rgba(74, 52, 35, 0.22));
 }
 
 .trip-map-paw-shape svg {
@@ -94,7 +102,7 @@
 }
 
 .trip-map-paw--landed .trip-map-paw-shape {
-  opacity: 0.95;
+  opacity: 1;
   transform: translateX(var(--paw-off, 0)) scale(1);
 }
 
@@ -104,6 +112,7 @@
   width: 46px;
   height: 46px;
   pointer-events: none;
+  z-index: 6; /* above the paw trail + pins — the photo is never covered */
 }
 
 .trip-map-stamp-shape {

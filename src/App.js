@@ -1,34 +1,26 @@
 import { useState } from 'react';
 import HomeScreen from './components/HomeScreen';
 import MapTimelineScreen from './components/MapTimelineScreen';
-import CelebrationScreen from './components/CelebrationScreen';
 import SAMPLE_JEJU_PHOTOS from './data/samplePhotos';
 import './App.css';
 
 function App() {
   const [photos, setPhotos] = useState(null);
-  const [pendingPhotos, setPendingPhotos] = useState(null);
 
   const handlePhotosParsed = (results) => {
     const normalized = results.map((photo, index) => ({
       id: `upload-${index}-${photo.fileName}`,
       ...photo,
     }));
-    setPendingPhotos(normalized);
+    setPhotos(normalized);
   };
 
   const handleSampleTrip = () => {
-    setPendingPhotos(SAMPLE_JEJU_PHOTOS);
-  };
-
-  const handleCelebrationDone = () => {
-    setPhotos(pendingPhotos);
-    setPendingPhotos(null);
+    setPhotos(SAMPLE_JEJU_PHOTOS);
   };
 
   const handleBackToHome = () => {
     setPhotos(null);
-    setPendingPhotos(null);
   };
 
   const handleOpenStoryModal = () => {
@@ -43,10 +35,6 @@ function App() {
       )
     );
   };
-
-  if (pendingPhotos) {
-    return <CelebrationScreen onDone={handleCelebrationDone} />;
-  }
 
   if (photos) {
     return (

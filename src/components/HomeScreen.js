@@ -4,8 +4,8 @@ import AppHeader from './AppHeader';
 import logo from '../assets/logo.png';
 import mascotHero from '../assets/mascot-hero.png';
 import cameraIcon from '../assets/camera.png';
-import toriHuh from '../assets/tori-huh.png';
 import { Cloud, Plane, Paw, Sparkle, DottedPath } from './Doodles';
+import ToriAlert from './ToriAlert';
 import './HomeScreen.css';
 
 const MIN_PHOTOS = 5;
@@ -15,7 +15,7 @@ function HomeScreen({ onPhotosParsed, onSampleTrip, onGoHome }) {
   const [isDragging, setIsDragging] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
-  const [error, setError] = useState('');
+  const [alert, setAlert] = useState(null);
   const fileInputRef = useRef(null);
   const dragCounter = useRef(0);
 
@@ -26,19 +26,28 @@ function HomeScreen({ onPhotosParsed, onSampleTrip, onGoHome }) {
       );
 
       if (files.length === 0) {
-        setError('이미지 파일을 선택해주세요.');
+        setAlert({
+          title: '앗, 사진이 없어요',
+          message: '이미지 파일을 선택해주세요.',
+        });
         return;
       }
       if (files.length < MIN_PHOTOS) {
-        setError(`사진을 최소 ${MIN_PHOTOS}장 이상 선택해주세요.`);
+        setAlert({
+          title: '사진이 조금 부족해요',
+          message: `여행 지도를 그리려면 사진이 최소 ${MIN_PHOTOS}장 필요해요.\n${files.length}장을 고르셨어요.`,
+        });
         return;
       }
       if (files.length > MAX_PHOTOS) {
-        setError(`사진은 최대 ${MAX_PHOTOS}장까지 업로드할 수 있습니다.`);
+        setAlert({
+          title: '사진이 너무 많아요',
+          message: `사진은 최대 ${MAX_PHOTOS}장까지 올릴 수 있어요.\n${files.length}장을 고르셨어요.`,
+        });
         return;
       }
 
-      setError('');
+      setAlert(null);
       setIsParsing(true);
       setProgress({ done: 0, total: files.length });
 
@@ -129,7 +138,7 @@ function HomeScreen({ onPhotosParsed, onSampleTrip, onGoHome }) {
           <div className="hero-heading">
             <p className="hero-heading-eyebrow">
               <Sparkle size={14} aria-hidden="true" />
-              업로드만 하면 토리가 알아서 그려줘요
+              사진을 업로드만 하면 토리가 그려줘요
             </p>
             <h1 className="hero-heading-title">
               사진 몇 장으로 완성하는
@@ -204,12 +213,6 @@ function HomeScreen({ onPhotosParsed, onSampleTrip, onGoHome }) {
                   hidden
                   onChange={handleFileInputChange}
                 />
-                {error && (
-                  <p className="drop-zone-error">
-                    <img src={toriHuh} alt="" aria-hidden="true" />
-                    {error}
-                  </p>
-                )}
                 <div className="ticket-divider" aria-hidden="true" />
                 <p className="ticket-footnote">JPG · PNG · HEIC 지원</p>
               </>
@@ -274,12 +277,6 @@ function HomeScreen({ onPhotosParsed, onSampleTrip, onGoHome }) {
               <div className="ticket-preview">
                 <div className="ticket-preview-card">
                   <div className="ticket-preview-stub">
-                    <span
-                      className="ticket-preview-stub-icon"
-                      aria-hidden="true"
-                    >
-                      🎫
-                    </span>
                     <span className="ticket-preview-stub-label">
                       TRIP
                       <br />
@@ -346,6 +343,13 @@ function HomeScreen({ onPhotosParsed, onSampleTrip, onGoHome }) {
           © {new Date().getFullYear()} 트립루트. All rights reserved.
         </p>
       </footer>
+
+      <ToriAlert
+        open={alert !== null}
+        title={alert?.title}
+        message={alert?.message}
+        onClose={() => setAlert(null)}
+      />
     </div>
   );
 }
